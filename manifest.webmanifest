@@ -1,0 +1,17 @@
+{
+  "name": "SQLD 모의 시험장",
+  "short_name": "모의시험장",
+  "description": "학교 교실을 재현한 SQL 개발자 자격시험 모의고사장",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1d2326",
+  "theme_color": "#1d2326",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

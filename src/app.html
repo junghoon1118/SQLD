@@ -1,0 +1,956 @@
+<title>SQLD 모의 시험장</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Nanum+Myeongjo:wght@400;700;800&family=Nanum+Pen+Script&display=swap">
+<style>
+/* Layout: 교실 시야(캔버스) 위, 필기구 막대, 그 아래 나무 책상 위에 문제지와 OMR 답안지를 나란히 둔다. 시험장 하나의 세계로 고정된 단일 테마. */
+:root{
+  --desk:#b48a5c; --desk-dark:#7e5d3b; --paper:#fdfcf7; --ink:#1d1c1a; --ink-soft:#5a564e;
+  --omr:#cf3f69; --omr-tint:#fde6ed; --omr-paper:#fffdfa;
+  --bar:#1d2326; --bar-2:#283034; --bar-line:#3a4448; --bar-fg:#e8ebe6; --bar-mute:#9aa5a0;
+  --accent:#3d7a5f; --accent-2:#2f6049; --ok:#2f7a4c; --bad:#b3243d; --warn:#b45309;
+  --f-paper:"Nanum Myeongjo","Batang","AppleMyungjo",serif;
+  --f-ui:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --f-hand:"Nanum Pen Script","Nanum Brush Script",cursive;
+  --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  --sceneH:clamp(160px,34vh,380px);
+  color-scheme:light;
+}
+html,body{height:100%}
+body{background:var(--bar);color:var(--bar-fg);font-family:var(--f-ui);overflow:hidden}
+button{font:inherit}
+:focus-visible{outline:2px solid #f2c94c;outline-offset:2px}
+#app{position:relative;height:100%;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:var(--sceneH) auto minmax(0,1fr)}
+#app.scene-off{grid-template-rows:0 auto minmax(0,1fr)}
+#sceneWrap{position:relative;overflow:hidden;background:#cfc7b2;min-height:0}
+#scene{width:100%;height:100%;display:block}
+
+/* 방송 자막 */
+#pa{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:30;width:min(680px,calc(100% - 32px));
+  display:flex;gap:12px;align-items:flex-start;background:rgba(18,22,24,.93);color:#f4f2ea;border:1px solid #4a5357;border-radius:8px;padding:9px 14px;font-size:14px;line-height:1.55;box-shadow:0 6px 20px rgba(0,0,0,.35)}
+#pa .lab{flex:none;font-size:11px;letter-spacing:.12em;color:#f2c94c;font-weight:600;padding-top:3px;display:flex;align-items:center;gap:6px}
+#pa .lab svg{width:15px;height:15px}
+#pa p{margin:0}
+
+/* 상단 막대 */
+#bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding-block:8px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  background:var(--bar);border-top:1px solid #0d1011;border-bottom:1px solid #0d1011;font-size:13px}
+.chip{display:flex;align-items:center;gap:8px;color:var(--bar-mute);font-variant-numeric:tabular-nums;white-space:nowrap}
+.chip b{color:var(--bar-fg);font-weight:600}
+#mclock{width:30px;height:30px;flex:none}
+.seg{display:inline-flex;border:1px solid var(--bar-line);border-radius:6px;overflow:hidden}
+.seg button{border:0;background:var(--bar-2);color:var(--bar-fg);padding:6px 10px;cursor:pointer;font-size:13px}
+.seg button+button{border-left:1px solid var(--bar-line)}
+.seg button[aria-pressed="true"]{background:var(--bar-fg);color:var(--bar)}
+.tabs{display:none}
+.spacer{flex:1}
+.btn{border:1px solid var(--bar-line);background:var(--bar-2);color:var(--bar-fg);padding:6px 11px;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap}
+.btn:hover:not(:disabled){background:#323b40}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.primary{background:var(--accent);border-color:var(--accent)}
+.btn.primary:hover:not(:disabled){background:var(--accent-2)}
+
+/* 책상 */
+#desk{position:relative;min-height:0;display:flex;gap:18px;padding-block:14px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  background:
+    repeating-linear-gradient(93deg,rgba(80,50,20,.07) 0 2px,transparent 2px 9px),
+    repeating-linear-gradient(88deg,rgba(255,240,210,.06) 0 1px,transparent 1px 23px),
+    linear-gradient(180deg,#a87f53,#b98f60 30%,#ad8556)}
+.sheet{min-height:0;min-width:0;overflow:auto;box-shadow:0 1px 0 rgba(0,0,0,.08),0 10px 24px rgba(50,30,10,.35)}
+#paper{flex:1 1 auto;background:var(--paper);color:var(--ink);font-family:var(--f-paper)}
+#omrBox{flex:0 0 min(450px,42%);background:var(--omr-paper)}
+.empty-sheet{height:100%;min-height:200px;display:grid;place-items:center;text-align:center;color:#7a6a55;font-family:var(--f-ui);font-size:14px;line-height:1.7;padding:24px;background:rgba(255,255,255,.35)}
+#paper:has(.empty-sheet),#omrBox:has(.empty-sheet){background:rgba(255,250,240,.25);box-shadow:inset 0 0 0 2px rgba(255,255,255,.35)}
+
+/* 문제지 */
+.cover{max-width:620px;margin:0 auto;padding-block:48px 40px;padding-inline:28px;text-align:center}
+.cover .yr{font-size:15px;letter-spacing:.2em;margin:0}
+.cover h2{font-size:clamp(26px,4vw,38px);font-weight:800;margin:10px 0 4px;letter-spacing:.04em;text-wrap:balance}
+.cover .sub{margin:0 0 26px;color:var(--ink-soft);font-size:15px}
+.cover table{margin:0 auto 26px;border-collapse:collapse;font-family:var(--f-ui);font-size:14px}
+.cover td,.cover th{border:1px solid #444;padding:7px 16px}
+.cover th{background:#efece3;font-weight:600}
+.cover .rules{text-align:left;border:1.5px solid var(--ink);padding:16px 20px;font-size:14.5px;line-height:1.75}
+.cover .rules h3{margin:0 0 6px;font-size:16px;text-align:center;letter-spacing:.3em}
+.cover .rules ol{margin:0;padding-left:20px}
+.cover .wait{margin-top:26px;font-family:var(--f-ui);font-weight:600;color:var(--bad);letter-spacing:.05em}
+.page{padding:26px 30px 16px;border-bottom:1px dashed #b9b3a6;position:relative}
+.page-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;border-bottom:2.5px solid var(--ink);padding-bottom:6px;margin-bottom:16px;font-size:13px;font-family:var(--f-ui);color:var(--ink-soft)}
+.page-head b{font-family:var(--f-paper);font-size:16px;color:var(--ink);font-weight:800}
+.subj{border:1.5px solid var(--ink);padding:6px 12px;font-weight:800;font-size:15px;margin:0 0 16px;display:inline-block}
+.cols{column-count:2;column-gap:30px;column-rule:1px solid #d3cdc0}
+.page-foot{text-align:center;font-size:13px;color:var(--ink-soft);margin-top:6px;font-family:var(--f-ui)}
+.q{break-inside:avoid;margin:0 0 24px;font-size:15px}
+.qh{font-weight:700;line-height:1.6;margin:0}
+.qn{cursor:pointer;position:relative;display:inline-block;padding-right:2px}
+.qn.slash::after{content:"";position:absolute;left:-5px;right:-3px;top:52%;height:1.6px;background:#666;transform:rotate(-38deg)}
+.opts{list-style:none;padding:0;margin:9px 0 0;display:grid;gap:5px}
+.opt{cursor:pointer;line-height:1.55;display:flex;gap:6px;border-radius:3px}
+.opt:hover{background:rgba(0,0,0,.035)}
+.cn{position:relative;flex:none;width:1.25em;text-align:center}
+.oc{font-family:var(--f-mono);font-size:12.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;min-width:0}
+.opt.circ .cn::after{content:"";position:absolute;inset:-2px -4px;border:1.7px solid #5f5f5f;border-radius:50%;transform:rotate(-10deg)}
+.tbls{display:flex;flex-wrap:wrap;gap:6px 18px;margin:9px 0 2px;max-width:100%;overflow-x:auto}
+.tb{border-collapse:collapse;font-family:var(--f-ui);font-size:13px}
+.tb caption{caption-side:top;text-align:left;font-weight:600;padding-bottom:3px}
+.tb th,.tb td{border:1px solid #7d7a73;padding:3px 10px;text-align:center;font-variant-numeric:tabular-nums}
+.tb th{background:#efece4;font-weight:600}
+pre.code{font-family:var(--f-mono);font-size:13px;line-height:1.55;border:1px solid #7d7a73;padding:8px 11px;margin:9px 0 2px;white-space:pre;overflow-x:auto;background:#fff}
+.end-mark{text-align:center;padding:22px 0 36px;font-weight:700;letter-spacing:.3em}
+
+/* OMR */
+.omr{position:relative;color:var(--omr);font-size:12px;padding:14px 14px 18px 30px;min-height:100%;user-select:none}
+.omr.locked .b{cursor:not-allowed}
+.tm{position:absolute;left:9px;top:16px;bottom:16px;width:10px;background:repeating-linear-gradient(to bottom,#151515 0 7px,transparent 7px 24px)}
+.omr-title{text-align:center;border:2px solid var(--omr);padding:7px 6px 6px;font-weight:700;font-size:15px;letter-spacing:.08em}
+.omr-title small{display:block;font-size:11px;letter-spacing:.02em;font-weight:500;margin-top:2px}
+.omr-info{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:8px}
+.fld-o{border:1.5px solid var(--omr)}
+.fld-o .lab{background:var(--omr-tint);padding:3px 7px;font-weight:600;border-bottom:1px solid var(--omr)}
+.fld-o .val{min-height:38px;padding:0 10px;font-family:var(--f-hand);font-size:28px;line-height:38px;color:#151515;cursor:pointer;display:block;width:100%;text-align:left;border:0;background:transparent}
+.stampbox{display:grid;place-items:center;min-height:52px;padding:4px}
+.stamp{color:#c81e1e;border:2px solid #c81e1e;border-radius:50%;width:42px;height:42px;display:grid;place-items:center;font-weight:700;transform:rotate(-14deg);font-size:12px;font-family:var(--f-paper);opacity:.85}
+.stamp-empty{color:rgba(207,63,105,.55);font-size:11px}
+.idg{border-collapse:collapse;margin-top:8px;width:100%}
+.idg td{border:1px solid rgba(207,63,105,.5);text-align:center;padding:1px 0}
+.idg .wr td{height:30px;font-family:var(--f-hand);font-size:24px;color:#151515;border-color:var(--omr)}
+.idg .lab td{background:var(--omr-tint);font-weight:600;border-color:var(--omr);padding:3px}
+.notes{margin:8px 0 0;padding:6px 8px 6px 22px;border:1px solid rgba(207,63,105,.6);line-height:1.55;font-size:11px}
+.ans{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px;align-items:start}
+.acol{border:1.5px solid var(--omr)}
+.ahead,.arow{display:grid;grid-template-columns:28px 1fr;align-items:center}
+.ahead{background:var(--omr-tint);font-weight:600;text-align:center;border-bottom:1.5px solid var(--omr);height:24px}
+.ahead span:first-child{border-right:1px solid var(--omr);height:100%;display:grid;place-items:center}
+.arow{height:31px;border-bottom:1px solid rgba(207,63,105,.3)}
+.arow.g5{border-bottom:1.5px solid var(--omr)}
+.arow:last-child{border-bottom:0}
+.anum{font-weight:700;background:var(--omr-tint);height:100%;display:grid;place-items:center;border-right:1px solid var(--omr);font-variant-numeric:tabular-nums}
+.abubs{display:flex;justify-content:space-around;padding:0 2px}
+.b{appearance:none;-webkit-appearance:none;border:1.2px solid var(--omr);background:transparent;color:var(--omr);width:16px;height:22px;border-radius:50%;font-size:10px;line-height:1;padding:0;font-family:var(--f-ui);position:relative;cursor:pointer;display:inline-grid;place-items:center}
+.b:hover{background:rgba(207,63,105,.08)}
+.b.t::before{content:"";position:absolute;left:-4px;right:-4px;top:-3px;bottom:-3px;background:#fbfbf6;box-shadow:0 0 0 1px #e3e0d6,0 1px 2px rgba(0,0,0,.18);border-radius:2px}
+.b.m::after{content:"";position:absolute;inset:0;border-radius:50%;background:#141414;transform:rotate(4deg) scale(1.04,1)}
+.idg .b{width:14px;height:18px;font-size:9px}
+
+/* 오버레이 */
+.overlay{position:fixed;inset:0;z-index:60;overflow:auto;display:grid;place-items:center;padding-block:24px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));background:rgba(14,18,20,.55)}
+.ticket{width:min(560px,100%);background:#fbfaf3;color:var(--ink);border:1px solid #cfc8b8;box-shadow:0 18px 50px rgba(0,0,0,.45);padding:22px 24px 24px;font-family:var(--f-ui)}
+.t-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;border-bottom:3px double var(--ink);padding-bottom:12px}
+.t-eyebrow{margin:0;font-size:12px;letter-spacing:.16em;color:var(--ink-soft)}
+.ticket h1{margin:4px 0 0;font-family:var(--f-paper);font-weight:800;font-size:28px;letter-spacing:.03em}
+.photo{flex:none;width:62px;height:80px;border:1px dashed #8c867a;display:grid;place-items:center;text-align:center;font-size:11px;color:#8c867a;line-height:1.4}
+.t-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));margin:14px 0 0;border-top:1px solid #bdb6a6;border-left:1px solid #bdb6a6}
+.t-grid div{border-right:1px solid #bdb6a6;border-bottom:1px solid #bdb6a6;padding:7px 10px}
+.t-grid dt{font-size:11px;color:var(--ink-soft);letter-spacing:.08em}
+.t-grid dd{margin:2px 0 0;font-weight:600;font-size:15px;font-variant-numeric:tabular-nums}
+.fld{display:grid;gap:5px;margin-top:16px;font-size:13px;font-weight:600}
+.fld input{font:inherit;font-weight:400;font-size:15px;padding:9px 11px;border:1px solid #a9a293;background:#fff;color:var(--ink);border-radius:4px}
+.ticket fieldset{border:0;padding:0;margin:14px 0 0;min-width:0}
+.ticket legend{font-size:13px;font-weight:600;padding:0;margin-bottom:6px}
+.radios{display:flex;flex-wrap:wrap;gap:6px}
+.radios label{position:relative}
+.radios input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.radios span{display:block;border:1px solid #a9a293;padding:7px 12px;border-radius:4px;font-size:13.5px;background:#fff;cursor:pointer}
+.radios input:checked+span{background:var(--ink);color:#fbfaf3;border-color:var(--ink)}
+.radios input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+.chk{display:flex;gap:8px;align-items:center;margin-top:14px;font-size:13.5px}
+.t-notes{margin:16px 0 0;padding:12px 14px 12px 30px;background:#f1eee4;font-size:12.5px;line-height:1.65;color:#3c3a35}
+.enter{margin-top:18px;width:100%;padding:13px;font-size:16px;font-weight:700;letter-spacing:.2em;background:var(--ink);color:#fbfaf3;border:0;border-radius:4px;cursor:pointer}
+.enter:hover{background:#333}
+.dialog{width:min(440px,100%);background:#fbfaf3;color:var(--ink);border-radius:8px;padding:20px 22px;box-shadow:0 18px 50px rgba(0,0,0,.45)}
+.dialog h2{margin:0 0 8px;font-size:18px}
+.dialog p{margin:0 0 8px;font-size:14px;line-height:1.65;color:#3c3a35}
+.dialog .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+.dbtn{border:1px solid #a9a293;background:#fff;color:var(--ink);padding:8px 14px;border-radius:5px;cursor:pointer;font-size:14px}
+.dbtn.primary{background:var(--ink);color:#fbfaf3;border-color:var(--ink)}
+#toast{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);z-index:20;background:rgba(20,24,26,.92);color:#f4f2ea;padding:8px 14px;border-radius:6px;font-size:13px;max-width:calc(100% - 32px);text-align:center}
+#idc{position:absolute;left:max(16px,env(safe-area-inset-left,0px));bottom:16px;z-index:21;width:min(330px,calc(100% - 32px));background:#fbfaf3;color:var(--ink);border-radius:8px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.4);font-size:13px;line-height:1.55;display:flex;gap:12px;align-items:center}
+.idcard{flex:none;width:76px;height:48px;border-radius:5px;background:linear-gradient(135deg,#dfe9ee,#c7d6de);position:relative;box-shadow:inset 0 0 0 1px #9fb2bc}
+.idcard::before{content:"";position:absolute;left:7px;top:8px;width:20px;height:27px;background:#9aaab2;border-radius:2px}
+.idcard::after{content:"";position:absolute;left:33px;top:12px;width:34px;height:4px;background:#8a9aa2;box-shadow:0 8px 0 #8a9aa2,0 16px 0 #a9b7be}
+#idc b{display:block}
+#collect{position:fixed;inset:0;z-index:55;display:grid;place-items:center;background:rgba(14,18,20,.55);color:#f4f2ea;font-size:16px;text-align:center;line-height:1.7;padding:24px}
+
+/* 결과 */
+#result{place-items:start center;background:linear-gradient(180deg,#a87f53,#b48a5c)}
+.report{width:min(860px,100%);background:var(--paper);color:var(--ink);box-shadow:0 18px 50px rgba(0,0,0,.35);padding:28px 30px 34px;font-family:var(--f-ui)}
+.report h1{font-family:var(--f-paper);font-weight:800;font-size:26px;margin:0;letter-spacing:.05em}
+.r-top{display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:flex-end;border-bottom:3px double var(--ink);padding-bottom:12px}
+.r-top p{margin:4px 0 0;color:var(--ink-soft);font-size:13px;font-variant-numeric:tabular-nums}
+.verdict{font-family:var(--f-paper);font-weight:800;font-size:22px;padding:6px 16px;border:2.5px solid currentColor;transform:rotate(-4deg)}
+.verdict.pass{color:var(--ok)} .verdict.fail{color:var(--bad)}
+.scores{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid #8d887d;margin-top:18px}
+.scores div{padding:12px 14px;border-right:1px solid #8d887d}
+.scores div:last-child{border-right:0}
+.scores dt{font-size:12px;color:var(--ink-soft)}
+.scores dd{margin:4px 0 0;font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}
+.scores dd small{font-size:13px;font-weight:500;color:var(--ink-soft)}
+.scores .cut{color:var(--bad);font-size:12px;font-weight:600}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-top:14px}
+.fact{background:#f1eee4;padding:10px 12px;font-size:13px;line-height:1.5}
+.fact b{display:block;font-size:17px;font-variant-numeric:tabular-nums}
+.fact.alert{background:#fbe9ec}
+.r-sec{margin-top:24px}
+.r-sec h2{font-size:16px;margin:0 0 10px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.rv{border-top:1px solid #d6d0c3;padding:12px 0;display:grid;grid-template-columns:44px minmax(0,1fr);gap:10px}
+.rv .no{font-weight:700;font-variant-numeric:tabular-nums}
+.pill{display:inline-block;font-size:11px;font-weight:600;padding:2px 7px;border-radius:999px;margin-top:4px}
+.pill.ok{background:#e1f0e6;color:var(--ok)} .pill.no{background:#fbe3e7;color:var(--bad)} .pill.blank,.pill.dup{background:#fcefdc;color:var(--warn)}
+.rv .qt{margin:0;font-family:var(--f-paper);font-weight:700;font-size:14.5px;line-height:1.55}
+.rv .an{margin:6px 0 0;font-size:13px;line-height:1.6}
+.rv .ex{margin:4px 0 0;font-size:13px;line-height:1.65;color:#3c3a35}
+.r-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:20px}
+
+@media (max-width:1100px){ .cols{column-count:1} }
+@media (max-width:860px){
+  :root{--sceneH:clamp(130px,27vh,260px)}
+  .tabs{display:inline-flex}
+  #bar{gap:6px 8px;padding-block:6px}
+  .btn,.seg button{padding:5px 8px;font-size:12px}
+  .spacer{display:none}
+  #desk .sheet{display:none}
+  #desk[data-tab="paper"] #paper,#desk[data-tab="omr"] #omrBox{display:block}
+  #omrBox{flex:1 1 auto}
+  .page{padding:20px 18px 14px}
+  .scores{grid-template-columns:1fr}
+  .scores div{border-right:0;border-bottom:1px solid #8d887d}
+  .scores div:last-child{border-bottom:0}
+  .report{padding:22px 18px 28px}
+}
+@media (max-width:420px){ .omr{padding-left:24px;padding-right:8px} .tm{left:6px;width:8px} .ans{gap:4px} .ahead,.arow{grid-template-columns:22px 1fr} .b{width:14px;height:20px;font-size:9px} }
+@media (prefers-reduced-motion:reduce){ *{scroll-behavior:auto!important} }
+</style>
+
+<div id="app">
+  <div id="sceneWrap">
+    <canvas id="scene" aria-label="시험실 앞쪽을 바라본 모습: 칠판, 벽시계, 앞줄 수험생과 감독관"></canvas>
+  </div>
+  <div id="pa" hidden role="status" aria-live="polite">
+    <span class="lab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 9a4 4 0 0 1 0 6"/><path d="M18.5 6.5a8 8 0 0 1 0 11"/></svg>교내 방송</span>
+    <p id="paText"></p>
+  </div>
+  <div id="bar">
+    <div class="chip"><svg id="mclock" viewBox="0 0 40 40" aria-label="교실 벽시계"><circle cx="20" cy="20" r="18" fill="#fbfaf4" stroke="#9aa5a0" stroke-width="2"/><g id="mticks"></g><line id="mh" x1="20" y1="20" x2="20" y2="11" stroke="#1d2326" stroke-width="2.6" stroke-linecap="round"/><line id="mm" x1="20" y1="20" x2="20" y2="6" stroke="#1d2326" stroke-width="1.8" stroke-linecap="round"/><line id="ms" x1="20" y1="22" x2="20" y2="5" stroke="#c81e1e" stroke-width=".9"/><circle cx="20" cy="20" r="1.6" fill="#1d2326"/></svg><span id="chipTxt"></span></div>
+    <div class="seg" role="group" aria-label="필기구">
+      <button id="toolPen" aria-pressed="true">컴퓨터용 사인펜</button><button id="toolTape" aria-pressed="false">수정테이프</button>
+    </div>
+    <div class="seg tabs" role="group" aria-label="보기">
+      <button id="tabPaper" aria-pressed="true">문제지</button><button id="tabOmr" aria-pressed="false">답안지</button>
+    </div>
+    <span class="spacer"></span>
+    <button id="skipPre" class="btn" hidden>안내 건너뛰고 바로 시작</button>
+    <button id="btnScene" class="btn">교실 접기</button>
+    <button id="btnSound" class="btn">소리 끄기</button>
+    <button id="btnSwap" class="btn" disabled>답안지 교체 요청</button>
+    <button id="btnSubmit" class="btn primary" disabled>답안지 제출</button>
+  </div>
+  <div id="desk" data-tab="paper">
+    <div id="paper" class="sheet"></div>
+    <div id="omrBox" class="sheet"></div>
+    <div id="toast" hidden></div>
+    <div id="idc" hidden><div class="idcard" aria-hidden="true"></div><div><b>감독관이 본인 확인 중입니다</b>"수험표랑 신분증 잠깐 볼게요." 감독관이 얼굴과 사진을 번갈아 봅니다.</div></div>
+  </div>
+</div>
+
+<section id="intro" class="overlay">
+  <form id="introForm" class="ticket" autocomplete="off">
+    <header class="t-head">
+      <div><p class="t-eyebrow">수험표 · 입실 전 확인</p><h1>SQLD 모의 시험장</h1></div>
+      <div class="photo" aria-hidden="true">사진<br>3×4</div>
+    </header>
+    <dl class="t-grid">
+      <div><dt>수험번호</dt><dd id="tNo"></dd></div>
+      <div><dt>시험실</dt><dd id="tRoom"></dd></div>
+      <div><dt>좌석 (무작위 배정)</dt><dd id="tSeat"></dd></div>
+      <div><dt>감독관</dt><dd id="tProc"></dd></div>
+    </dl>
+    <label class="fld" for="nm"><span>성명</span><input id="nm" maxlength="10" placeholder="홍길동"></label>
+    <fieldset><legend>시험 시간</legend><div class="radios">
+      <label><input type="radio" name="dur" id="dur90" value="90" checked><span>실전 90분</span></label>
+      <label><input type="radio" name="dur" id="dur30" value="30"><span>단축 30분</span></label>
+      <label><input type="radio" name="dur" id="dur10" value="10"><span>체험 10분</span></label>
+    </div></fieldset>
+    <fieldset><legend>방해 요소</legend><div class="radios">
+      <label><input type="radio" name="lv" id="lvLow" value="low"><span>약하게</span></label>
+      <label><input type="radio" name="lv" id="lvMid" value="mid" checked><span>보통</span></label>
+      <label><input type="radio" name="lv" id="lvHigh" value="high"><span>강하게</span></label>
+    </div></fieldset>
+    <label class="chk" for="preOn"><input type="checkbox" id="preOn" checked> 시험 전 안내 방송부터 시작 (약 2분 30초)</label>
+    <ul class="t-notes">
+      <li>소리가 나는 시험입니다. 이어폰을 쓰면 더 실감 나요.</li>
+      <li>1과목 10문항, 2과목 40문항, 문항당 2점(총 100점). 총점 60점 이상이면서 과목별 40% 이상이면 합격으로 판정해요.</li>
+      <li>답은 OMR 답안지에만 채점됩니다. 문제지에 표시한 답은 채점되지 않아요.</li>
+      <li>문제는 이 연습장에서 자체 제작했으며 공식 시험과 관련이 없어요. 실제 규정은 데이터자격검정 공식 사이트에서 확인하세요.</li>
+    </ul>
+    <button class="enter" type="submit">입실하기</button>
+  </form>
+</section>
+
+<section id="modal" class="overlay" hidden><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="mTitle"><h2 id="mTitle"></h2><div id="mBody"></div><div class="acts" id="mActs"></div></div></section>
+<div id="collect" hidden></div>
+<section id="result" class="overlay" hidden></section>
+
+<script>
+(function(){
+"use strict";
+const $=s=>document.querySelector(s);
+const now=()=>performance.now()/1000;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const CN=["①","②","③","④"];
+const REDUCED=matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ───────── 문제 (자체 제작) ───────── */
+const E2={name:"EMP",cols:["EMPNO","ENAME","DEPTNO","SAL","COMM","MGR"],rows:[[1001,"김철수",10,3000,"NULL","NULL"],[1002,"이영희",10,2500,300,1001],[1003,"박민수",20,2500,"NULL",1001],[1004,"최지은",20,4000,500,1001],[1005,"정우성",30,1500,0,1004],[1006,"한소희","NULL",2000,"NULL",1004]]};
+const D2={name:"DEPT",cols:["DEPTNO","DNAME"],rows:[[10,"기획"],[20,"개발"],[30,"영업"],[40,"인사"]]};
+const QS=[
+{s:1,q:`[수강] 테이블의 기본키는 (학번, 과목코드)이고 함수 종속이 아래와 같다. 이 테이블이 만족하는 가장 높은 정규형은?`,t:[{name:"수강",cols:["학번","과목코드","성명","학과","성적"],rows:[[2301,"C01","김하늘","컴공","A"],[2301,"C02","김하늘","컴공","B"],[2302,"C01","이바다","경영","B"]]}],code:`학번 → 성명, 학과\n(학번, 과목코드) → 성적`,o:[`제1정규형`,`제2정규형`,`제3정규형`,`BCNF`],a:0,fix:1,e:`성명과 학과가 기본키의 일부인 학번에만 종속되는 부분 함수 종속이 있어 제2정규형을 만족하지 못합니다. 모든 값이 원자값이므로 제1정규형까지만 만족합니다.`},
+{s:1,q:`[사원] 테이블의 함수 종속이 아래와 같다. 제3정규화를 한 결과로 가장 적절한 것은?`,t:[{name:"사원",cols:["사원번호(PK)","부서코드","부서명","급여"],rows:[["E01","D1","기획",3000],["E02","D1","기획",2800],["E03","D2","개발",3500]]}],code:`사원번호 → 부서코드, 급여\n부서코드 → 부서명`,o:[`사원(사원번호, 부서코드, 급여), 부서(부서코드, 부서명)`,`사원(사원번호, 부서명, 급여), 부서(부서코드, 부서명)`,`사원(사원번호, 급여), 부서(부서코드, 부서명, 사원번호)`,`사원(사원번호, 부서코드, 부서명), 급여(사원번호, 급여)`],a:0,e:`사원번호 → 부서코드 → 부서명의 이행 함수 종속을 없애야 합니다. 부서명을 부서 테이블로 옮기고, 사원에는 외래키인 부서코드를 남깁니다.`},
+{s:1,q:`[수강지도] 테이블의 기본키는 (학생, 과목)이다. 교수 한 명은 한 과목만 가르치고, 한 과목은 여러 교수가 가르칠 수 있다. 이 테이블에 대한 설명으로 옳은 것은?`,t:[{name:"수강지도",cols:["학생","과목","교수"],rows:[["S1","DB","P1"],["S2","DB","P2"],["S1","OS","P3"]]}],code:`(학생, 과목) → 교수\n교수 → 과목`,o:[`부분 함수 종속이 있어 제2정규형을 만족하지 않는다.`,`이행 함수 종속이 있어 제3정규형을 만족하지 않는다.`,`제3정규형은 만족하지만 BCNF는 만족하지 않는다.`,`BCNF를 만족한다.`],a:2,fix:1,e:`후보키는 (학생, 과목)과 (학생, 교수)입니다. 교수 → 과목에서 과목은 키를 이루는 속성이라 제3정규형은 만족하지만, 결정자인 교수가 후보키가 아니므로 BCNF는 만족하지 않습니다.`},
+{s:1,q:`[회원] 테이블의 전화번호 컬럼에 한 회원의 번호가 여러 개 들어 있다. 정규화 관점에서 가장 적절한 처리는?`,t:[{name:"회원",cols:["회원ID","이름","전화번호"],rows:[["M1","김하늘","010-1111-2222, 02-333-4444"],["M2","이바다","010-5555-6666"]]}],o:[`회원전화(회원ID, 전화번호) 테이블로 분리한다.`,`전화번호1, 전화번호2 컬럼으로 나누어 저장한다.`,`이름을 기본키로 바꿔 중복을 막는다.`,`조회 성능을 위해 현재 구조를 그대로 유지한다.`],a:0,e:`한 칸에 여러 값이 들어 있어 제1정규형을 위반합니다. 컬럼을 번호별로 늘리는 방식은 반복 그룹이라 번호가 세 개가 되면 다시 구조를 바꿔야 합니다. 별도 테이블로 분리하는 것이 맞습니다.`},
+{s:1,q:`다음 업무 규칙을 [고객]과 [주문]의 관계로 표현할 때 가장 적절한 것은?`,code:`- 고객은 주문을 한 번도 하지 않을 수도 있고, 여러 번 할 수도 있다.\n- 주문은 반드시 한 명의 고객이 한다.`,o:[`1:N 관계이며, 고객 쪽은 선택 참여, 주문 쪽은 필수 참여이다.`,`1:N 관계이며, 고객 쪽과 주문 쪽 모두 필수 참여이다.`,`M:N 관계이며, 양쪽 모두 선택 참여이다.`,`1:1 관계이며, 주문 쪽만 선택 참여이다.`],a:0,e:`고객 한 명에 주문이 여러 개라 1:N입니다. 주문이 없는 고객도 있으므로 고객 입장에서는 선택 참여, 고객 없는 주문은 없으므로 주문 입장에서는 필수 참여입니다.`},
+{s:1,q:`[학생]과 [강좌]의 M:N 관계를 [수강신청] 엔터티로 풀었다. 학생은 같은 강좌를 학기를 바꿔 다시 신청할 수 있다. [수강신청]의 주식별자로 가장 적절한 것은?`,o:[`(학번)`,`(학번, 강좌번호)`,`(학번, 강좌번호, 학기)`,`(강좌번호, 학기)`],a:2,fix:1,e:`(학번, 강좌번호)만으로는 같은 강좌를 다른 학기에 다시 신청한 기록을 구분할 수 없습니다. 학기까지 포함해야 인스턴스를 유일하게 식별할 수 있습니다.`},
+{s:1,q:`[고객] 슈퍼타입 아래 [개인고객]과 [법인고객] 서브타입이 있고, 서브타입마다 전용 속성이 많다. 이를 하나의 테이블로 통합해 물리 모델로 만들 때의 단점으로 가장 적절한 것은?`,o:[`개인고객만 조회할 때도 반드시 조인이 필요하다.`,`서브타입 전용 속성에 NULL 값이 많이 생긴다.`,`전체 고객을 조회하려면 UNION을 써야 한다.`,`테이블 수가 늘어나 관리가 복잡해진다.`],a:1,e:`하나로 통합하면 조인과 UNION이 필요 없지만, 개인고객 행에는 법인 전용 속성이, 법인고객 행에는 개인 전용 속성이 비어 NULL이 많아집니다. 테이블이 커져 조회 효율도 떨어질 수 있습니다.`},
+{s:1,q:`계좌이체 트랜잭션을 예로 들 때, 트랜잭션의 특성과 예시를 잘못 짝지은 것은?`,o:[`원자성: 이체 중 입금이 실패하면 이미 처리한 출금도 함께 취소된다.`,`일관성: 이체 전후로 두 계좌 잔액의 합은 같아야 한다.`,`고립성: 이체가 끝나기 전에는 다른 트랜잭션이 바뀐 잔액을 볼 수 없다.`,`지속성: 커밋하기 전에 장애가 나도 이체 결과는 반드시 남아 있어야 한다.`],a:3,fix:1,e:`지속성은 커밋이 끝난 결과가 장애가 나도 사라지지 않는다는 뜻입니다. 커밋 전에 장애가 나면 원자성에 따라 전부 취소되는 것이 맞습니다.`},
+{s:1,q:`[주문상세]의 주식별자를 본질식별자 (주문번호, 상품번호) 대신 인조식별자 (주문번호, 순번)으로 바꾸었다. 이때 생길 수 있는 문제로 가장 적절한 것은?`,o:[`같은 주문에 같은 상품이 두 번 들어가는 것을 주식별자로 막을 수 없다.`,`주문번호를 부모 엔터티에서 상속받을 수 없게 된다.`,`주식별자에 NULL 값이 허용된다.`,`주문 테이블과 조인할 수 없게 된다.`],a:0,e:`순번은 행마다 새로 붙는 값이라 같은 상품이 중복으로 들어가도 주식별자가 겹치지 않습니다. 중복을 막으려면 (주문번호, 상품번호)에 별도의 유니크 제약이 필요하고, 그만큼 인덱스도 늘어납니다.`},
+{s:1,q:`[부서]와 [사원]은 1:N 관계이다. 아직 부서에 배치되지 않은 신입사원도 등록할 수 있어야 한다. 이 요구를 반영한 설계로 가장 적절한 것은?`,o:[`비식별 관계로 두고, 사원의 부서번호(외래키)는 NULL을 허용한다.`,`식별 관계로 바꿔 부서번호를 사원의 주식별자에 포함한다.`,`사원의 주식별자를 (부서번호, 사원번호)로 정한다.`,`부서번호 NOT NULL을 유지하고, 신입사원은 등록하지 않는다.`],a:0,e:`부서 없이도 사원이 존재해야 하므로 사원은 부서에 선택 참여합니다. 부서번호를 일반 외래키로 두는 비식별 관계로 하고 NULL을 허용해야 합니다. 식별 관계로 만들면 부서번호가 주식별자라 NULL이 될 수 없습니다.`},
+
+{s:2,q:`[EMP] 테이블에 대해 다음 SQL을 실행한 결과는?`,t:[E2],code:`SELECT COUNT(COMM), SUM(COMM), ROUND(AVG(COMM), 2)\nFROM EMP;`,o:[`3, 800, 266.67`,`6, 800, 133.33`,`2, 800, 400`,`3, 800, 400`],a:0,e:`COMM이 NULL이 아닌 행은 300, 500, 0의 3건입니다. 0은 NULL이 아니라 값이므로 개수에 들어갑니다. 합계 800 ÷ 3 = 266.67입니다.`},
+{s:2,q:`[EMP] 테이블에 대해 다음 SQL을 실행한 결과로 옳은 것은?`,t:[E2],code:`SELECT DEPTNO, SUM(SAL)\nFROM EMP\nWHERE SAL >= 2000\nGROUP BY DEPTNO\nHAVING COUNT(*) >= 2\nORDER BY DEPTNO;`,o:[`(10, 5500), (20, 6500)`,`(10, 5500), (20, 6500), (NULL, 2000)`,`(10, 5500), (20, 6500), (30, 1500)`,`(20, 6500)`],a:0,e:`WHERE로 SAL 2000 이상만 남기면 10번 부서 2명(5500), 20번 부서 2명(6500), DEPTNO가 NULL인 1명(2000)입니다. NULL 그룹은 1건이라 HAVING에서 빠집니다.`},
+{s:2,q:`다음 중 실행 시 오류가 발생하는 SQL은?`,oc:1,o:[`SELECT DEPTNO, COUNT(*) FROM EMP GROUP BY DEPTNO;`,`SELECT DEPTNO, ENAME, MAX(SAL) FROM EMP GROUP BY DEPTNO;`,`SELECT DEPTNO FROM EMP GROUP BY DEPTNO HAVING AVG(SAL) > 2000;`,`SELECT MAX(SAL) FROM EMP;`],a:1,e:`GROUP BY를 쓰면 SELECT 절에는 GROUP BY에 적은 컬럼이나 집계 함수만 올 수 있습니다. ENAME은 둘 다 아니라 오류가 납니다.`},
+{s:2,q:`다음 중 실행 시 오류가 발생하는 SQL은?`,oc:1,o:[`SELECT SAL * 12 AS ANNUAL FROM EMP ORDER BY ANNUAL;`,`SELECT SAL * 12 AS ANNUAL FROM EMP WHERE ANNUAL > 30000;`,`SELECT ENAME, SAL FROM EMP ORDER BY 2 DESC;`,`SELECT E.ENAME FROM EMP E WHERE E.SAL > 2000;`],a:1,e:`WHERE는 SELECT보다 먼저 처리되므로 SELECT 절의 별칭 ANNUAL을 쓸 수 없습니다. ORDER BY는 SELECT 뒤에 처리되어 별칭과 컬럼 순서 번호를 모두 쓸 수 있습니다.`},
+{s:2,q:`[EMP] 테이블에 대해 (가), (나)를 실행한 결과를 순서대로 고른 것은?`,t:[E2],code:`-- (가)\nSELECT COUNT(*) FROM EMP WHERE SAL + COMM > 2500;\n-- (나)\nSELECT COUNT(*) FROM EMP WHERE SAL + NVL(COMM, 0) > 2500;`,o:[`2, 3`,`3, 3`,`2, 4`,`3, 4`],a:0,e:`(가)는 COMM이 NULL이면 SAL + COMM도 NULL이라 비교에서 빠집니다. 2800, 4500의 2건입니다. (나)는 NULL을 0으로 바꿔 3000, 2800, 4500의 3건입니다.`},
+{s:2,q:`[EMP], [DEPT] 테이블에 대해 (가), (나)를 실행한 결과를 순서대로 고른 것은?`,t:[E2,D2],code:`-- (가)\nSELECT COUNT(*) FROM DEPT\nWHERE DEPTNO NOT IN (SELECT DEPTNO FROM EMP);\n-- (나)\nSELECT COUNT(*) FROM DEPT D\nWHERE NOT EXISTS (SELECT 1 FROM EMP E\n                  WHERE E.DEPTNO = D.DEPTNO);`,o:[`0, 1`,`1, 1`,`1, 0`,`0, 0`],a:0,e:`서브쿼리 결과에 NULL(한소희)이 섞여 있으면 NOT IN은 어떤 행도 참이 될 수 없어 0건입니다. NOT EXISTS는 NULL 영향을 받지 않아 사원이 없는 40번 부서 1건이 나옵니다.`},
+{s:2,q:`[EMP], [DEPT] 테이블에 대해 (가), (나)를 실행한 결과를 순서대로 고른 것은?`,t:[E2,D2],code:`-- (가)\nSELECT COUNT(*)\nFROM DEPT D LEFT OUTER JOIN EMP E\n  ON D.DEPTNO = E.DEPTNO AND E.SAL > 2500;\n-- (나)\nSELECT COUNT(*)\nFROM DEPT D LEFT OUTER JOIN EMP E\n  ON D.DEPTNO = E.DEPTNO\nWHERE E.SAL > 2500;`,o:[`4, 2`,`2, 2`,`4, 4`,`6, 2`],a:0,e:`(가)는 조건이 ON에 있어 DEPT 4건이 모두 남습니다. 10번은 김철수, 20번은 최지은과 연결되고 30, 40번은 NULL로 남아 4건입니다. (나)는 조인 후 WHERE에서 걸러 김철수, 최지은 2건만 남습니다.`},
+{s:2,q:`[EMP] 테이블에 대해 다음 SQL을 실행했을 때 결과 행의 수는?`,t:[E2],code:`SELECT E.ENAME, M.ENAME AS MGR_NAME\nFROM EMP E JOIN EMP M\n  ON E.MGR = M.EMPNO\nWHERE M.ENAME = '최지은';`,o:[`1`,`2`,`3`,`5`],a:1,fix:1,e:`관리자(M)가 최지은(1004)인 사원을 찾는 셀프 조인입니다. MGR이 1004인 정우성, 한소희 2건입니다.`},
+{s:2,q:`[EMP] 테이블에 대해 다음 SQL을 실행했을 때, (가) 박민수의 RK와 (나) 한소희의 DRK를 순서대로 고른 것은?`,t:[E2],code:`SELECT ENAME,\n       RANK()       OVER (ORDER BY SAL DESC) AS RK,\n       DENSE_RANK() OVER (ORDER BY SAL DESC) AS DRK\nFROM EMP;`,o:[`3, 4`,`3, 5`,`4, 4`,`4, 5`],a:0,e:`SAL 내림차순은 4000, 3000, 2500, 2500, 2000, 1500입니다. 박민수(2500)는 공동 3위입니다. 한소희(2000)는 RANK로는 5위지만 DENSE_RANK는 번호를 건너뛰지 않아 4위입니다.`},
+{s:2,q:`[EMP] 테이블에 대해 다음 SQL을 실행한 결과의 DEPT_SUM 값은?`,t:[E2],code:`SELECT ENAME,\n       SUM(SAL) OVER (PARTITION BY DEPTNO) AS DEPT_SUM\nFROM EMP\nWHERE ENAME = '이영희';`,o:[`2500`,`5500`,`15500`,`NULL`],a:0,e:`윈도우 함수는 WHERE로 행을 거른 뒤에 계산됩니다. 남은 행이 이영희 1건뿐이라 부서 합계도 2500입니다.`},
+{s:2,q:`[EMP] 테이블에 대해 다음 SQL을 실행했을 때, EMPNO가 1006인 행의 S 값은?`,t:[E2],code:`SELECT EMPNO,\n       SUM(SAL) OVER (ORDER BY SAL\n                      ROWS BETWEEN 1 PRECEDING\n                               AND 1 FOLLOWING) AS S\nFROM EMP;`,o:[`3500`,`4500`,`6000`,`6500`],a:2,fix:1,e:`SAL 오름차순으로 1500, 2000(1006), 2500, ... 입니다. 앞 1행, 자기 자신, 뒤 1행을 더하면 1500 + 2000 + 2500 = 6000입니다.`},
+{s:2,q:`[EMP] 테이블에 대해 다음 SQL을 실행했을 때, 박민수 행의 ACC 값은?`,t:[E2],code:`SELECT ENAME,\n       SUM(SAL) OVER (ORDER BY SAL) AS ACC\nFROM EMP;`,o:[`2500`,`6000`,`8500`,`15500`],a:2,fix:1,e:`ORDER BY만 쓰면 기본 범위가 RANGE UNBOUNDED PRECEDING이라 같은 값(2500)인 행까지 함께 더합니다. 1500 + 2000 + 2500 + 2500 = 8500입니다.`},
+{s:2,q:`[EMP] 테이블에 대해 다음 SQL을 실행했을 때, EMPNO가 1003인 행의 PREV2 값은?`,t:[E2],code:`SELECT EMPNO,\n       LAG(SAL, 2, 0) OVER (ORDER BY EMPNO) AS PREV2\nFROM EMP;`,o:[`0`,`2500`,`3000`,`NULL`],a:2,fix:1,e:`LAG(SAL, 2, 0)은 두 행 앞의 SAL을 가져오고, 없으면 0을 씁니다. 1003의 두 행 앞은 1001이라 3000입니다.`},
+{s:2,q:`급여(SAL) 상위 2명의 이름을 정확하게 구하는 Oracle SQL은?`,oc:1,o:[`SELECT ENAME FROM EMP WHERE ROWNUM <= 2 ORDER BY SAL DESC;`,`SELECT ENAME FROM (SELECT ENAME FROM EMP ORDER BY SAL DESC) WHERE ROWNUM <= 2;`,`SELECT ENAME FROM EMP ORDER BY SAL DESC WHERE ROWNUM <= 2;`,`SELECT ENAME FROM (SELECT ENAME FROM EMP ORDER BY SAL DESC) WHERE ROWNUM = 2;`],a:1,e:`ROWNUM은 ORDER BY보다 먼저 매겨지므로 인라인 뷰에서 먼저 정렬해야 합니다. ①은 아무 2건을 뽑아 정렬하고, ③은 문법 오류, ④는 0건입니다.`},
+{s:2,q:`[EMP] 테이블에 대해 다음 SQL을 실행했을 때 결과 행의 수는?`,t:[E2],code:`SELECT EMPNO, ENAME, LEVEL\nFROM EMP\nSTART WITH EMPNO = 1004\nCONNECT BY PRIOR EMPNO = MGR;`,o:[`1`,`2`,`3`,`6`],a:2,fix:1,e:`1004(최지은)에서 시작해 MGR이 1004인 정우성, 한소희로 내려갑니다. 그 아래는 없어 3건입니다.`},
+{s:2,q:`[EMP] 테이블에 대해 다음 SQL을 실행한 결과의 ENAME 순서로 옳은 것은?`,t:[E2],code:`SELECT ENAME\nFROM EMP\nSTART WITH EMPNO = 1006\nCONNECT BY EMPNO = PRIOR MGR;`,o:[`한소희, 최지은, 김철수`,`김철수, 최지은, 한소희`,`한소희, 정우성`,`한소희`],a:0,e:`PRIOR가 MGR 쪽에 붙어 자식에서 부모로 올라가는 역방향입니다. 한소희 → 최지은(1004) → 김철수(1001) 순서이고, 김철수의 MGR이 NULL이라 끝납니다.`},
+{s:2,q:`[EMP] 테이블에 대해 다음 SQL을 실행했을 때 결과 행의 수는?`,t:[E2],code:`SELECT DEPTNO, COUNT(*)\nFROM EMP\nWHERE DEPTNO IS NOT NULL\nGROUP BY ROLLUP(DEPTNO);`,o:[`3`,`4`,`5`,`6`],a:1,fix:1,e:`부서 10, 20, 30의 3건에 전체 합계 1건이 더해져 4건입니다.`},
+{s:2,q:`[EMP] 테이블에 대해 다음 SQL을 실행했을 때, 전체 합계 행의 G와 TOTAL 값은?`,t:[E2],code:`SELECT DEPTNO, GROUPING(DEPTNO) AS G, SUM(SAL) AS TOTAL\nFROM EMP\nWHERE DEPTNO IS NOT NULL\nGROUP BY ROLLUP(DEPTNO);`,o:[`1, 13500`,`0, 13500`,`1, 15500`,`0, 15500`],a:0,e:`ROLLUP이 만든 소계·합계 행에서 GROUPING은 1입니다. DEPTNO가 NULL인 한소희(2000)는 WHERE에서 빠져 15500 - 2000 = 13500입니다.`},
+{s:2,q:`다음 중 실행 시 오류가 발생하는 SQL은?`,oc:1,o:[`SELECT DEPTNO FROM EMP UNION SELECT DEPTNO FROM DEPT ORDER BY DEPTNO;`,`SELECT DEPTNO FROM EMP ORDER BY DEPTNO UNION SELECT DEPTNO FROM DEPT;`,`SELECT DEPTNO, NULL FROM EMP UNION ALL SELECT DEPTNO, DNAME FROM DEPT;`,`SELECT DEPTNO FROM DEPT MINUS SELECT DEPTNO FROM EMP;`],a:1,e:`집합 연산자를 쓸 때 ORDER BY는 전체 문장의 맨 끝에 한 번만 올 수 있습니다.`},
+{s:2,q:`[EMP], [DEPT] 테이블에 대해 다음 SQL을 실행했을 때 결과 행의 수는?`,t:[E2,D2],code:`SELECT DEPTNO FROM EMP\nUNION\nSELECT DEPTNO FROM DEPT;`,o:[`4`,`5`,`6`,`10`],a:1,fix:1,e:`UNION은 중복을 없앱니다. 10, 20, 30, 40에 NULL 1건이 더해져 5건입니다. 중복 제거에서는 NULL끼리 같은 값으로 봅니다.`},
+{s:2,q:`[EMP], [DEPT] 테이블에 대해 다음 SQL을 실행했을 때 결과 행의 수는?`,t:[E2,D2],code:`SELECT DEPTNO FROM DEPT\nINTERSECT\nSELECT DEPTNO FROM EMP;`,o:[`2`,`3`,`4`,`5`],a:1,fix:1,e:`양쪽에 모두 있는 10, 20, 30의 3건입니다.`},
+{s:2,q:`[EMP] 테이블에 대해 실행 시 오류가 발생하는 SQL은?`,oc:1,o:[`SELECT ENAME FROM EMP WHERE SAL = (SELECT MAX(SAL) FROM EMP);`,`SELECT ENAME FROM EMP WHERE SAL = (SELECT SAL FROM EMP WHERE DEPTNO = 10);`,`SELECT ENAME FROM EMP WHERE SAL IN (SELECT SAL FROM EMP WHERE DEPTNO = 10);`,`SELECT ENAME FROM EMP WHERE SAL > ALL (SELECT SAL FROM EMP WHERE DEPTNO = 10);`],a:1,e:`10번 부서 사원은 2명이라 서브쿼리가 2행을 돌려줍니다. 단일 행 연산자 =에 여러 행이 오면 오류가 납니다.`},
+{s:2,q:`[EMP] 테이블에 대해 다음 SQL을 실행했을 때 결과 행의 수는?`,t:[E2],code:`SELECT COUNT(*)\nFROM EMP E\nWHERE SAL > (SELECT AVG(SAL)\n             FROM EMP\n             WHERE DEPTNO = E.DEPTNO);`,o:[`1`,`2`,`3`,`4`],a:1,fix:1,e:`10번 평균 2750보다 큰 김철수, 20번 평균 3250보다 큰 최지은이 해당합니다. 한소희는 DEPTNO = NULL 비교라 평균이 NULL이 되어 빠집니다. 총 2건입니다.`},
+{s:2,q:`[EMP] 테이블에 대해 (가), (나)를 실행한 결과를 순서대로 고른 것은?`,t:[E2],code:`-- (가)\nSELECT COUNT(*) FROM EMP\nWHERE SAL > ANY (SELECT SAL FROM EMP WHERE DEPTNO = 20);\n-- (나)\nSELECT COUNT(*) FROM EMP\nWHERE SAL > ALL (SELECT SAL FROM EMP WHERE DEPTNO = 20);`,o:[`2, 0`,`3, 0`,`2, 1`,`4, 1`],a:0,e:`20번 부서 SAL은 2500, 4000입니다. > ANY는 최솟값 2500보다 크면 되어 3000, 4000의 2건, > ALL은 4000보다 커야 해서 0건입니다.`},
+{s:2,q:`다음 SQL의 결과로 옳은 것은?`,code:`SELECT LENGTH(TRIM('  SQL D  ')),\n       INSTR('DATABASE', 'A', 1, 2)\nFROM DUAL;`,o:[`5, 4`,`9, 2`,`5, 2`,`7, 4`],a:0,e:`TRIM은 양쪽 공백만 지워 'SQL D'(5글자)가 됩니다. INSTR의 마지막 인자 2는 두 번째로 나오는 'A'를 뜻해 위치 4입니다.`},
+{s:2,q:`[EMP] 테이블에서 EMPNO가 1006인 행에 대해 다음 SQL을 실행한 결과로 옳은 것은?`,t:[E2],code:`SELECT DECODE(DEPTNO, NULL, 'N', 'Y'),\n       CASE DEPTNO WHEN NULL THEN 'N' ELSE 'Y' END\nFROM EMP\nWHERE EMPNO = 1006;`,o:[`'N', 'Y'`,`'Y', 'Y'`,`'N', 'N'`,`'Y', 'N'`],a:0,e:`DECODE는 NULL과 NULL을 같다고 봐서 'N'입니다. 단순 CASE는 DEPTNO = NULL로 비교해 참이 될 수 없어 ELSE의 'Y'가 나옵니다.`},
+{s:2,q:`[EMP] 테이블에 대해 다음 SQL을 실행한 결과로 옳은 것은?`,t:[E2],code:`SELECT COUNT(DISTINCT DEPTNO), COUNT(DEPTNO)\nFROM EMP;`,o:[`3, 5`,`4, 6`,`3, 6`,`4, 5`],a:0,e:`COUNT는 NULL을 세지 않습니다. 서로 다른 값은 10, 20, 30의 3개이고, NULL이 아닌 값은 5개입니다.`},
+{s:2,q:`[EMP] 테이블에 대해 다음 Oracle SQL을 실행했을 때, 첫 번째와 두 번째 행의 ENAME은?`,t:[E2],code:`SELECT ENAME\nFROM EMP\nORDER BY DEPTNO DESC, SAL ASC;`,o:[`한소희, 정우성`,`정우성, 박민수`,`김철수, 이영희`,`정우성, 한소희`],a:0,e:`Oracle은 NULL을 가장 큰 값으로 봐서 내림차순에서는 맨 앞에 둡니다. DEPTNO가 NULL인 한소희가 먼저 나오고, 그다음이 30번 부서 정우성입니다.`},
+{s:2,q:`빈 테이블 T(ID NUMBER)에 다음 SQL을 차례로 실행한 뒤, T의 행 수는?`,code:`INSERT INTO T VALUES (1);\nCOMMIT;\nINSERT INTO T VALUES (2);\nSAVEPOINT SP1;\nINSERT INTO T VALUES (3);\nROLLBACK TO SP1;\nINSERT INTO T VALUES (4);\nCOMMIT;`,o:[`1`,`2`,`3`,`4`],a:2,fix:1,e:`ROLLBACK TO SP1은 저장점 이후의 3만 취소합니다. 마지막 COMMIT으로 1, 2, 4가 저장되어 3건입니다.`},
+{s:2,q:`Oracle에서 빈 테이블 T(ID NUMBER)에 다음 SQL을 차례로 실행한 뒤, T의 행 수는?`,code:`INSERT INTO T VALUES (1);\nCREATE TABLE X (A NUMBER);\nROLLBACK;\nSELECT COUNT(*) FROM T;`,o:[`0`,`1`,`2`,`오류 발생`],a:1,fix:1,e:`Oracle에서 DDL(CREATE)은 실행 전후로 자동 커밋됩니다. INSERT가 이미 커밋되어 ROLLBACK으로 되돌릴 수 없으니 1건입니다.`},
+{s:2,q:`다음 SQL을 차례로 실행했을 때 T에 남는 행의 수는? (오류가 난 문장만 실패하고 다음 문장은 계속 실행된다.)`,code:`CREATE TABLE T (\n  ID NUMBER PRIMARY KEY,\n  NM VARCHAR2(10) NOT NULL\n);\nINSERT INTO T VALUES (1, 'A');\nINSERT INTO T VALUES (1, 'B');\nINSERT INTO T VALUES (2, NULL);\nINSERT INTO T VALUES (3, 'C');\nCOMMIT;`,o:[`1`,`2`,`3`,`4`],a:1,fix:1,e:`(1, 'B')는 기본키 중복, (2, NULL)은 NOT NULL 위반으로 실패합니다. (1, 'A'), (3, 'C')의 2건이 남습니다.`},
+{s:2,q:`[EMP] 테이블에 대해 다음 SQL을 실행했을 때 변경되는 행의 수는?`,t:[E2],code:`UPDATE EMP\nSET SAL = SAL * 1.1\nWHERE COMM IS NULL;`,o:[`2`,`3`,`4`,`6`],a:1,fix:1,e:`COMM이 NULL인 김철수, 박민수, 한소희의 3건입니다. 정우성의 COMM 0은 NULL이 아니라 값입니다.`},
+{s:2,q:`다음 MERGE 문을 실행한 뒤 [T] 테이블의 행 수와 ID가 2인 행의 V 값은?`,t:[{name:"T",cols:["ID","V"],rows:[[1,"a"],[2,"b"]]},{name:"S",cols:["ID","V"],rows:[[2,"x"],[3,"y"]]}],code:`MERGE INTO T\nUSING S ON (T.ID = S.ID)\nWHEN MATCHED THEN\n  UPDATE SET T.V = S.V\nWHEN NOT MATCHED THEN\n  INSERT (ID, V) VALUES (S.ID, S.V);`,o:[`3, 'x'`,`3, 'b'`,`4, 'x'`,`2, 'x'`],a:0,e:`ID 2는 일치해서 'x'로 바뀌고, ID 3은 없어서 새로 들어갑니다. T는 (1, 'a'), (2, 'x'), (3, 'y')의 3건이 됩니다.`},
+{s:2,q:`다음 중 Oracle에서 실행 시 오류가 발생하는 SQL은?`,oc:1,o:[`SELECT DEPTNO, ENAME FROM EMP JOIN DEPT USING (DEPTNO);`,`SELECT E.DEPTNO, ENAME FROM EMP E JOIN DEPT D USING (DEPTNO);`,`SELECT E.ENAME, D.DNAME FROM EMP E JOIN DEPT D ON E.DEPTNO = D.DEPTNO;`,`SELECT ENAME, DNAME FROM EMP NATURAL JOIN DEPT;`],a:1,e:`USING이나 NATURAL JOIN에 쓰인 조인 컬럼 앞에는 테이블 별칭(E.)을 붙일 수 없습니다.`},
+{s:2,q:`[EMP], [DEPT] 테이블에 대해 다음 SQL을 실행했을 때 결과 행의 수는?`,t:[E2,D2],code:`SELECT ENAME, DNAME\nFROM EMP NATURAL JOIN DEPT;`,o:[`4`,`5`,`6`,`7`],a:1,fix:1,e:`두 테이블에 공통으로 있는 DEPTNO로 조인합니다. DEPTNO가 NULL인 한소희는 짝이 없어 빠지고 5건입니다.`},
+{s:2,q:`[EMP], [DEPT] 테이블에 대해 다음 SQL을 실행했을 때 결과 행의 수는?`,t:[E2,D2],code:`SELECT E.ENAME, D.DNAME\nFROM EMP E FULL OUTER JOIN DEPT D\n  ON E.DEPTNO = D.DEPTNO;`,o:[`5`,`6`,`7`,`8`],a:2,fix:1,e:`짝이 맞는 5건 + EMP에만 있는 한소희 1건 + DEPT에만 있는 40번 1건 = 7건입니다.`},
+{s:2,q:`[T] 테이블에 대해 다음 SQL을 실행한 결과는?`,t:[{name:"T",cols:["C"],rows:[["A_B"],["AB"],["A%B"],["_"]]}],code:`SELECT COUNT(*) FROM T\nWHERE C LIKE '%\\_%' ESCAPE '\\';`,o:[`1`,`2`,`3`,`4`],a:1,fix:1,e:`ESCAPE로 지정한 \\ 뒤의 _는 와일드카드가 아니라 글자 '_' 그 자체입니다. '_'를 포함한 'A_B'와 '_'의 2건입니다.`},
+{s:2,q:`[EMP] 테이블에 대해 (가), (나)를 실행한 결과를 순서대로 고른 것은?`,t:[E2],code:`-- (가)\nSELECT COUNT(*) FROM EMP WHERE DEPTNO IN (10, NULL);\n-- (나)\nSELECT COUNT(*) FROM EMP WHERE NVL(DEPTNO, 0) <> 10;`,o:[`2, 4`,`3, 4`,`2, 3`,`3, 3`],a:0,e:`(가)는 DEPTNO = 10 OR DEPTNO = NULL이라 10번 부서 2건만 나옵니다. (나)는 NULL을 0으로 바꿔 비교하므로 20, 20, 30, 0의 4건입니다.`},
+{s:2,q:`SQL Server에서 [EMP] 테이블에 대해 다음 SQL을 실행했을 때 결과 행의 수는?`,t:[E2],code:`SELECT TOP(3) WITH TIES ENAME\nFROM EMP\nORDER BY SAL DESC;`,o:[`2`,`3`,`4`,`6`],a:2,fix:1,e:`상위 3건은 4000, 3000, 2500입니다. WITH TIES는 마지막 값 2500과 같은 행을 함께 보여 주어 4건이 됩니다.`},
+{s:2,q:`Oracle에서 다음 SQL을 차례로 실행했을 때 사용자 C의 권한에 대한 설명으로 옳은 것은?`,code:`-- 사용자 A가 실행\nGRANT SELECT ON A.T TO B WITH GRANT OPTION;\n-- 사용자 B가 실행\nGRANT SELECT ON A.T TO C;\n-- 사용자 A가 실행\nREVOKE SELECT ON A.T FROM B;`,o:[`B와 C의 SELECT 권한이 모두 회수된다.`,`B의 권한만 회수되고 C는 계속 조회할 수 있다.`,`C의 권한만 회수되고 B는 계속 조회할 수 있다.`,`B가 C에게 부여했기 때문에 REVOKE 문에서 오류가 발생한다.`],a:0,e:`WITH GRANT OPTION으로 받은 객체 권한을 회수하면, 그 사용자가 다른 사람에게 준 권한도 함께 회수됩니다. 시스템 권한의 WITH ADMIN OPTION은 함께 회수되지 않는다는 점과 구분하세요.`},
+];
+
+/* ───────── 상태 ───────── */
+const S={phase:"intro",dur:90,level:"mid",pre:true,sound:true,tool:"pen",
+  room:3+Math.floor(Math.random()*18),row:Math.floor(Math.random()*5),col:Math.floor(Math.random()*6),
+  name:"",perm:[],omr:QS.map(()=>[0,0,0,0]),idm:Array.from({length:8},()=>Array(10).fill(0)),
+  nameOn:false,stamp:false,omrGiven:false,paperGiven:false,paperOpen:false,
+  paperC:Array(QS.length).fill(null),paperS:Array(QS.length).fill(false),
+  preT0:0,preLen:150,examT0:0,endAt:0,fired:new Set(),tl:[],etl:[],leaveOk:false,
+  events:0,swaps:0,leaves:0,nextEv:0,speaking:false};
+S.seat=S.row*6+S.col+1;
+S.examNo="26"+String(S.room).padStart(2,"0")+String(S.seat).padStart(2,"0")+String(1000+Math.floor(Math.random()*9000));
+S.perm=QS.map(q=>{const p=[0,1,2,3];if(!q.fix){for(let i=3;i>0;i--){const j=Math.floor(Math.random()*(i+1));[p[i],p[j]]=[p[j],p[i]];}}return p;});
+
+/* ───────── 교실 공간 ───────── */
+const COLS=[-3.0,-2.25,-0.38,0.38,2.25,3.0];
+const seatZ=i=>2.3+i*1.05;
+const AISLES=[-3.72,-1.3,1.3,3.72];
+const ZF=1.35, ZB=seatZ(4)+0.85;
+const HAIR=["#17130f","#211a15","#2a2119","#35291f","#0f0f10","#3b3027"];
+const CLOTH=["#3a414d","#2e333a","#4a4950","#5a4e44","#37483f","#45394b","#66645f","#28303b","#4d3a36"];
+const SKIN=["#b98f73","#c49a7c","#a87f65"];
+const students=[];
+for(let r=0;r<5;r++)for(let c=0;c<6;c++){
+  if(r===S.row&&c===S.col)continue;
+  students.push({r,c,x:COLS[c],z:seatZ(r),empty:Math.random()<0.1,hair:pick(HAIR),cloth:pick(CLOTH),skin:pick(SKIN),ph:Math.random()*6.28,act:null,a0:0,a1:0,w:rnd(.92,1.08)});
+}
+const nP=Math.random()<.5?2:3;
+const walkers=[];
+const HOMES=[{x:.95,z:.7},{x:-3.5,z:.95},{x:3.72,z:ZB+.25}];
+function mkWalker(o){return Object.assign({x:0,z:0,path:[],speed:.85,moving:false,walkT:0,stepAcc:0,vz:0,kind:"proctor",hidden:false,busy:false,onArrive:null,suit:"#23272f",pants:"#1b1e24",hair:"#18140f",skin:"#bf9679"},o);}
+for(let i=0;i<nP;i++)walkers.push(mkWalker({id:"P"+i,home:HOMES[i],x:HOMES[i].x,z:HOMES[i].z,suit:i===1?"#2c2e35":"#23272f"}));
+
+/* ───────── 소리 ───────── */
+let AC=null,master,sfx,amb,noiseBuf,scratchVoices=[];
+function initAudio(){
+  if(AC)return;
+  try{AC=new(window.AudioContext||window.webkitAudioContext)();}catch(e){AC=null;return;}
+  master=AC.createGain();master.gain.value=S.sound?1:0;master.connect(AC.destination);
+  sfx=AC.createGain();sfx.gain.value=.9;sfx.connect(master);
+  amb=AC.createGain();amb.gain.value=1;amb.connect(master);
+  const len=AC.sampleRate*2;noiseBuf=AC.createBuffer(1,len,AC.sampleRate);
+  const d=noiseBuf.getChannelData(0);for(let i=0;i<len;i++)d[i]=Math.random()*2-1;
+  const brown=AC.createBuffer(1,len,AC.sampleRate);const bd=brown.getChannelData(0);let l=0;
+  for(let i=0;i<len;i++){l=(l+.02*(Math.random()*2-1))/1.02;bd[i]=l*3.2;}
+  const rs=AC.createBufferSource();rs.buffer=brown;rs.loop=true;
+  const rf=AC.createBiquadFilter();rf.type="lowpass";rf.frequency.value=380;
+  const rg=AC.createGain();rg.gain.value=.05;rs.connect(rf);rf.connect(rg);rg.connect(amb);rs.start();
+  [[120,.0045],[240,.002]].forEach(([f,g])=>{const o=AC.createOscillator();o.frequency.value=f;const gg=AC.createGain();gg.gain.value=g;o.connect(gg);gg.connect(amb);o.start();});
+  for(let i=0;i<4;i++){
+    const s=AC.createBufferSource();s.buffer=noiseBuf;s.loop=true;
+    const f=AC.createBiquadFilter();f.type="bandpass";f.frequency.value=rnd(2800,5200);f.Q.value=1.3;
+    const g=AC.createGain();g.gain.value=0;const p=panner(rnd(-.9,.9));
+    s.connect(f);f.connect(g);g.connect(p);p.connect(amb);s.start(0,Math.random()*1.5);scratchVoices.push(g);
+  }
+  setInterval(()=>{
+    if(!AC)return;const t=AC.currentTime;
+    const act=S.phase==="exam"?1:S.phase==="pre"?.3:0;
+    scratchVoices.forEach(g=>{const on=Math.random()<.38*act;g.gain.setTargetAtTime(on?rnd(.004,.016):0,t,.03);});
+  },130);
+}
+function panner(v){if(AC.createStereoPanner){const p=AC.createStereoPanner();p.pan.value=clamp(v,-1,1);return p;}return AC.createGain();}
+function outNode(pan,vol){const g=AC.createGain();g.gain.value=vol;const p=panner(pan);g.connect(p);p.connect(sfx);return g;}
+function env(g,t,a,peak,dec){g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(Math.max(peak,.0002),t+a);g.gain.exponentialRampToValueAtTime(.0001,t+a+dec);}
+function burst(o){if(!AC)return;const t=o.t??AC.currentTime,dur=o.dur??.2,a=o.a??.01;
+  const s=AC.createBufferSource();s.buffer=noiseBuf;s.loop=true;
+  const f=AC.createBiquadFilter();f.type=o.type||"bandpass";f.frequency.setValueAtTime(o.f||1000,t);
+  if(o.f2)f.frequency.exponentialRampToValueAtTime(o.f2,t+a+dur);f.Q.value=o.q??1;
+  const g=AC.createGain();env(g,t,a,o.peak??.4,dur);s.connect(f);f.connect(g);g.connect(outNode(o.pan||0,o.vol??1));
+  s.start(t,Math.random()*1.5);s.stop(t+a+dur+.05);}
+function tone(o){if(!AC)return;const t=o.t??AC.currentTime,dur=o.dur??.2,a=o.a??.005;
+  const os=AC.createOscillator();os.type=o.type||"sine";os.frequency.setValueAtTime(o.f,t);
+  if(o.f2)os.frequency.exponentialRampToValueAtTime(o.f2,t+a+dur);
+  const g=AC.createGain();env(g,t,a,o.peak??.2,dur);os.connect(g);g.connect(o.dest||outNode(o.pan||0,o.vol??1));os.start(t);os.stop(t+a+dur+.05);}
+const T0=()=>AC?AC.currentTime:0;
+const snd={
+  cough(p,v){const t=T0();const n=Math.random()<.4?3:2;for(let i=0;i<n;i++){const k=1-i*.22;burst({t:t+i*.27,dur:.15,f:rnd(600,900),q:.8,a:.008,peak:.55*k,pan:p,vol:v});tone({t:t+i*.27,f:rnd(180,240),f2:130,dur:.11,type:"triangle",peak:.1*k,pan:p,vol:v});}},
+  sniff(p,v){burst({dur:.12,type:"bandpass",f:2400,f2:4200,q:1.2,a:.24,peak:.16,pan:p,vol:v});},
+  page(p,v,t){t=t??T0();burst({t,dur:.2,f:3200,f2:800,q:.7,a:.02,peak:.32,pan:p,vol:v});burst({t:t+.17,dur:.12,f:1500,q:.5,a:.01,peak:.13,pan:p,vol:v});},
+  chair(p,v){const t=T0();tone({t,type:"sawtooth",f:rnd(480,560),f2:rnd(720,860),dur:.32,a:.03,peak:.035,pan:p,vol:v});burst({t:t+.05,type:"lowpass",f:220,dur:.1,a:.005,peak:.35,pan:p,vol:v});},
+  pendrop(p,v){const t=T0();[[0,.5],[.16,.28],[.27,.14],[.34,.07]].forEach(([d,k])=>{burst({t:t+d,type:"highpass",f:2600,dur:.035,a:.002,peak:k,pan:p,vol:v});tone({t:t+d,f:1900,dur:.04,type:"triangle",peak:k*.15,pan:p,vol:v});});},
+  tap(p,v){const t=T0();let d=0;const n=14+Math.floor(Math.random()*16);for(let i=0;i<n;i++){d+=rnd(.16,.3);burst({t:t+d,type:"bandpass",f:1700,q:3,dur:.03,a:.002,peak:.3,pan:p,vol:v});}},
+  step(p,v){const t=T0();burst({t,type:"lowpass",f:330,dur:.09,a:.006,peak:.45,pan:p,vol:v});tone({t,f:90,f2:55,dur:.07,peak:.18,pan:p,vol:v});},
+  buzz(p,v){if(!AC)return;const t=T0();for(let i=0;i<3;i++){const s=t+i*.75;const o=AC.createOscillator();o.type="square";o.frequency.value=150;const f=AC.createBiquadFilter();f.type="lowpass";f.frequency.value=420;const g=AC.createGain();g.gain.setValueAtTime(.0001,s);g.gain.exponentialRampToValueAtTime(.08,s+.02);g.gain.setValueAtTime(.08,s+.42);g.gain.exponentialRampToValueAtTime(.0001,s+.46);o.connect(f);f.connect(g);g.connect(outNode(p,v));o.start(s);o.stop(s+.5);}},
+  door(p,v){const t=T0();tone({t,type:"sawtooth",f:280,f2:430,dur:.5,a:.05,peak:.025,pan:p,vol:v});burst({t:t+.55,type:"lowpass",f:170,dur:.3,a:.005,peak:.6,pan:p,vol:v});},
+  whisper(p,v){const t=T0();for(let i=0;i<6;i++)burst({t:t+i*rnd(.18,.3),type:"bandpass",f:rnd(2500,4200),q:2,dur:.12,a:.04,peak:.06,pan:p,vol:v});},
+  pen(){const t=T0();burst({t,type:"bandpass",f:3800,q:2,dur:.07,a:.005,peak:.16});burst({t:t+.08,type:"bandpass",f:3400,q:2,dur:.06,a:.005,peak:.12});},
+  pencil(){burst({type:"bandpass",f:5200,q:1.5,dur:.12,a:.01,peak:.09});},
+  tape(){burst({type:"bandpass",f:1800,f2:4200,q:1.4,dur:.32,a:.02,peak:.13});},
+  chime(){if(!AC)return;const t=T0()+.05;[[0,784],[.45,659.25],[.9,523.25],[1.35,392]].forEach(([d,f])=>{const g=outNode(.35,1);tone({t:t+d,f,dur:1.3,a:.01,peak:.2,dest:g});tone({t:t+d,f:f*2,dur:.6,a:.01,peak:.035,dest:outNode(.35,1)});});}
+};
+function duck(on){if(!AC)return;amb.gain.setTargetAtTime(on?.35:1,AC.currentTime,.2);}
+
+/* ───────── 방송 ───────── */
+const paQ=[];let paBusy=false,paTok=0,koVoice=null;
+function loadVoices(){try{const vs=speechSynthesis.getVoices();koVoice=vs.find(v=>/^ko[-_]KR/i.test(v.lang))||vs.find(v=>/^ko/i.test(v.lang))||null;}catch(e){koVoice=null;}}
+if("speechSynthesis" in window){loadVoices();try{speechSynthesis.onvoiceschanged=loadVoices;}catch(e){}}
+function cancelSpeech(){try{speechSynthesis.cancel();}catch(e){}}
+function announce(it,prio){
+  if(prio){paQ.length=0;paTok++;cancelSpeech();paBusy=false;}
+  paQ.push(it);if(!paBusy)nextPA();
+}
+function nextPA(){
+  const it=paQ.shift();
+  if(!it){paBusy=false;S.speaking=false;$("#pa").hidden=true;duck(false);return;}
+  paBusy=true;S.speaking=true;const tok=++paTok;
+  $("#paText").textContent=it.text;$("#pa").hidden=false;duck(true);
+  let delay=0;if(it.chime!==false){snd.chime();delay=2.1;}
+  setTimeout(()=>{if(tok!==paTok)return;speak(it.text,()=>{if(tok!==paTok)return;setTimeout(()=>{if(tok===paTok)nextPA();},1300);});},delay*1000);
+}
+function speak(text,done){
+  const est=text.length*.12+1.2;let fin=false;const f=()=>{if(fin)return;fin=true;done();};
+  if(S.sound&&koVoice&&"speechSynthesis" in window){
+    try{const u=new SpeechSynthesisUtterance(text);u.voice=koVoice;u.lang=koVoice.lang;u.rate=.95;u.onend=f;u.onerror=f;speechSynthesis.speak(u);}catch(e){}
+    setTimeout(f,est*1000+7000);
+  }else setTimeout(f,est*1000);
+}
+
+/* ───────── 시간 ───────── */
+function vSec(){
+  const t=now();
+  if(S.phase==="intro")return 8*3600+50*60;
+  if(S.phase==="pre")return 9*3600-(S.preLen-(t-S.preT0));
+  return 9*3600+((S.endAt||t)-S.examT0);
+}
+function hm(sec){sec=Math.floor(sec);const h=Math.floor(sec/3600)%24,m=Math.floor(sec/60)%60;return String(h).padStart(2,"0")+":"+String(m).padStart(2,"0");}
+const W1=()=>S.dur>=30?10:3, W2=()=>S.dur>=30?5:1;
+
+const PRE=[
+ {t:2,id:"enter",text:"수험생 여러분께 안내 말씀드립니다. 지금부터 입실을 마감합니다. 수험생은 수험표에 적힌 좌석에 앉아 주시기 바랍니다."},
+ {t:18,id:"phone",text:"휴대전화, 스마트워치, 이어폰 등 모든 전자기기는 전원을 끄고 감독관에게 제출해 주시기 바랍니다. 시험 중 전자기기를 가지고 있으면 부정행위로 처리됩니다.",act:()=>setTimeout(()=>{if(S.phase==="pre")phoneModal();},9000)},
+ {t:42,id:"omr",text:"지금부터 답안지를 나누어 드리겠습니다. 답안지를 받으면 성명과 수험번호를 컴퓨터용 사인펜으로 정확하게 표기해 주시기 바랍니다.",act:()=>setTimeout(()=>giveOmr(false),9000)},
+ {t:64,id:"paper",text:"이어서 문제지를 나누어 드리겠습니다. 시험 시작 안내가 있을 때까지 문제지를 넘기지 마십시오.",act:()=>setTimeout(()=>givePaper(false),7500)},
+ {t:78,id:"idcard",chime:false,text:"신분증과 수험표는 책상 위 왼쪽에 올려 두시기 바랍니다. 시험 중에 감독관이 본인 확인을 하겠습니다."},
+ {t:92,id:"onemin",text:"시험 시작 1분 전입니다. 필기구를 제외한 모든 물품은 가방에 넣어 주시기 바랍니다."}
+];
+function buildExamTL(){
+  const D=S.dur*60;
+  return [
+   {t:0,id:"start",prio:true,text:`지금부터 시험을 시작하겠습니다. 문제지를 넘기고 문제를 풀기 시작하십시오. 시험 시간은 ${S.dur}분입니다.`},
+   {t:Math.max(50,D*.12),id:"idcheck",silent:true,act:idCheck},
+   {t:D/3,id:"leave",text:"지금부터 퇴실할 수 있습니다. 퇴실하려는 수험생은 답안지를 감독관에게 제출하고 조용히 나가 주시기 바랍니다.",act:()=>{S.leaveOk=true;}},
+   {t:D-W1()*60,id:"w1",text:`시험 종료 ${W1()}분 전입니다. 답안지 표기를 마치지 않은 수험생은 서둘러 주시기 바랍니다.`},
+   {t:D-W2()*60,id:"w2",chime:false,text:`시험 종료 ${W2()}분 전입니다. 지금부터는 답안지를 교체할 수 없습니다. 수정이 필요하면 수정테이프를 사용하십시오.`},
+   {t:D,id:"end",prio:true,text:"시험이 종료되었습니다. 필기구를 내려놓고 손을 책상 아래로 내려 주십시오. 감독관이 답안지를 회수하겠습니다.",act:()=>finish("time")}
+  ];
+}
+function fire(it){if(!it.silent)announce(it,it.prio);if(it.act)it.act();}
+
+/* ───────── 진행 ───────── */
+function enter(e){
+  e.preventDefault();
+  S.name=($("#nm").value||"").trim()||"수험자";
+  S.dur=+document.querySelector('input[name="dur"]:checked').value;
+  S.level=document.querySelector('input[name="lv"]:checked').value;
+  S.pre=$("#preOn").checked;
+  initAudio();if(AC&&AC.resume)AC.resume();
+  if(S.pre&&koVoice){try{const u=new SpeechSynthesisUtterance(" ");u.volume=0;speechSynthesis.speak(u);}catch(err){}}
+  S.phase="pre";S.preLen=S.pre?150:7;S.preT0=now();
+  S.tl=S.pre?PRE:[{t:.3,id:"quick",silent:true,act:()=>{giveOmr(true);givePaper(true);}}];
+  $("#intro").hidden=true;$("#skipPre").hidden=!S.pre;
+  updChip();scheduleNext();
+}
+function startExam(){
+  S.phase="exam";S.examT0=S.preT0+S.preLen;
+  giveOmr(true);givePaper(true);closeModal();
+  S.paperOpen=true;renderPaper();
+  S.etl=buildExamTL();S.fired=new Set();
+  $("#skipPre").hidden=true;$("#btnSwap").disabled=false;$("#btnSubmit").disabled=false;
+  for(let i=0;i<24;i++){const st=pick(students);if(st.empty)continue;const s=srcOf(st);snd.page(s.pan,s.vol*.7,T0()+2.2+Math.random()*3.5);}
+  scheduleNext();
+}
+function skipPre(){
+  paQ.length=0;paTok++;cancelSpeech();paBusy=false;$("#pa").hidden=true;duck(false);
+  S.tl.forEach(it=>S.fired.add(it.id));giveOmr(true);givePaper(true);closeModal();
+  S.preT0=now()-S.preLen;
+}
+function giveOmr(instant){if(S.omrGiven)return;S.omrGiven=true;renderOmr();if(!instant){snd.page(0,.8);toast("감독관이 답안지를 나눠 주었습니다. 성명과 수험번호를 먼저 표기하세요.");}}
+function givePaper(instant){if(S.paperGiven)return;S.paperGiven=true;renderPaper();if(!instant){snd.page(.1,.9);toast("문제지를 받았습니다. 시작 안내 전까지 넘기지 마세요.");}}
+function finish(kind){
+  if(S.phase==="collect"||S.phase==="result")return;
+  S.phase="collect";S.endAt=Math.min(now(),S.examT0+S.dur*60);
+  $(".omr")&&$(".omr").classList.add("locked");
+  $("#btnSwap").disabled=true;$("#btnSubmit").disabled=true;closeModal();
+  const c=$("#collect");
+  c.innerHTML=kind==="time"?"<div><b>시험 종료</b><br>필기구를 내려놓으세요. 감독관이 답안지를 걷고 있습니다.</div>":"<div><b>답안지 제출</b><br>감독관에게 답안지를 내고 조용히 시험실을 나갑니다.</div>";
+  c.hidden=false;
+  if(kind!=="time"){snd.chair(0,.9);setTimeout(()=>snd.door(.8,.5),900);}
+  setTimeout(showResult,kind==="time"?9000:2600);
+}
+
+/* ───────── 감독관·수험생 움직임 ───────── */
+function aisleNear(x){let b=AISLES[0];for(const a of AISLES)if(Math.abs(a-x)<Math.abs(b-x))b=a;return b;}
+function route(fx,fz,tx,tz){
+  const p=[],a1=aisleNear(tx),front=fz<=ZF+.05,back=fz>=ZB-.05;
+  if(front||back){const zs=front?ZF:ZB;if(Math.abs(fz-zs)>.05)p.push({x:fx,z:zs});p.push({x:a1,z:zs});}
+  else{const a0=aisleNear(fx);if(Math.abs(fx-a0)>.05)p.push({x:a0,z:fz});
+    if(a0!==a1){const zs=(Math.abs(fz-ZF)+Math.abs(tz-ZF)<=Math.abs(fz-ZB)+Math.abs(tz-ZB))?ZF:ZB;p.push({x:a0,z:zs});p.push({x:a1,z:zs});}}
+  p.push({x:a1,z:tz});if(Math.abs(tx-a1)>.05)p.push({x:tx,z:tz});return p;
+}
+function chainRoute(w,pts){let x=w.x,z=w.z,all=[];for(const [tx,tz] of pts){all=all.concat(route(x,z,tx,tz));x=tx;z=tz;}return all;}
+function goTo(w,path,cb){w.path=path;w.busy=true;w.onArrive=()=>{w.busy=false;cb&&cb();};}
+function goHome(w,cb){goTo(w,route(w.x,w.z,w.home.x,w.home.z),cb);}
+function freeProctor(nearX,nearZ){const f=walkers.filter(w=>w.kind==="proctor"&&!w.busy);if(!f.length)return null;if(nearX==null)return pick(f);f.sort((a,b)=>Math.hypot(a.x-nearX,a.z-nearZ)-Math.hypot(b.x-nearX,b.z-nearZ));return f[0];}
+function stepWalker(w,dt){
+  if(!w.path.length){w.moving=false;return;}
+  const tg=w.path[0],dx=tg.x-w.x,dz=tg.z-w.z,dist=Math.hypot(dx,dz),v=w.speed*dt;
+  if(dist<=v){w.x=tg.x;w.z=tg.z;w.path.shift();if(!w.path.length){w.moving=false;const cb=w.onArrive;w.onArrive=null;cb&&cb();}}
+  else{w.x+=dx/dist*v;w.z+=dz/dist*v;w.vz=dz;w.moving=true;w.walkT+=dt;w.stepAcc+=dt;
+    if(w.stepAcc>.55){w.stepAcc=0;const s=srcXZ(w.x,w.z);snd.step(s.pan,s.vol*(w.kind==="proctor"?.75:.55));}}
+}
+function srcXZ(x,z){const dx=x-cam.x,dist=Math.hypot(dx,cam.z-z);return {pan:clamp(dx/3,-1,1),vol:clamp(1.6/(dist+.8),.07,1)};}
+const srcOf=st=>srcXZ(st.x,st.z);
+const visibleSt=st=>st.r<S.row&&!st.empty&&!st.act;
+function randSt(f){const c=students.filter(s=>!s.empty&&(!f||f(s)));return c.length?pick(c):null;}
+
+function scheduleNext(){const R={low:[35,70],mid:[15,36],high:[6,16]}[S.level];S.nextEv=now()+rnd(R[0],R[1])*(S.phase==="pre"?1.6:1);}
+function doEvent(){
+  const ex=S.phase==="exam";
+  const pool=[["cough",5],["sniff",4],["page",ex?6:1],["chair",3],["pendrop",2],["tap",ex?1.6:.3],["patrol",ex?3:1],["stretch",ex?3:.5],["scratch",ex?2:.5],["look",2],["hand",ex?1:0],["phone",ex?.5:.2],["leave",ex&&S.leaveOk?2.6:0]];
+  let tot=pool.reduce((a,b)=>a+b[1],0),r=Math.random()*tot,k="cough";
+  for(const [n,w] of pool){r-=w;if(r<=0){k=n;break;}}
+  S.events++;const t=now();
+  const vis=randSt(visibleSt);
+  const any=randSt(s=>!s.act);
+  if(!any)return;
+  const so=srcOf(any);
+  switch(k){
+    case "cough":snd.cough(so.pan,so.vol);if(any.r<S.row&&!any.act){any.act="look";any.a0=t;any.a1=t+1.2;}break;
+    case "sniff":snd.sniff(so.pan,so.vol);break;
+    case "page":snd.page(so.pan,so.vol);break;
+    case "chair":snd.chair(so.pan,so.vol);break;
+    case "pendrop":snd.pendrop(so.pan,so.vol);if(any.r<S.row){any.act="look";any.a0=t+.4;any.a1=t+2.2;}break;
+    case "tap":snd.tap(so.pan,so.vol);break;
+    case "patrol":patrol();break;
+    case "stretch":case "scratch":case "look":
+      if(vis){vis.act=k;vis.a0=t;vis.a1=t+(k==="stretch"?2.6:k==="scratch"?2.2:2.8);if(k==="stretch"){const s=srcOf(vis);snd.chair(s.pan,s.vol*.6);}}
+      else snd.chair(so.pan,so.vol);
+      break;
+    case "hand":{
+      const st=vis||any;st.act="hand";st.a0=t;st.a1=Infinity;
+      const w=freeProctor(st.x,st.z);
+      if(!w){setTimeout(()=>{st.act=null;},4000);break;}
+      goTo(w,route(w.x,w.z,aisleNear(st.x),st.z),()=>{const s=srcOf(st);snd.whisper(s.pan,s.vol);setTimeout(()=>{st.act=null;setTimeout(()=>goHome(w),1500);},2800);});
+      break;}
+    case "phone":{
+      snd.buzz(so.pan,so.vol);
+      const w=freeProctor(any.x,any.z);
+      if(w)goTo(w,route(w.x,w.z,aisleNear(any.x),any.z),()=>{const s=srcOf(any);snd.whisper(s.pan,s.vol);setTimeout(()=>goHome(w),2200);});
+      break;}
+    case "leave":{
+      const st=randSt(s=>!s.act);
+      if(!st||S.leaves>=students.length*.35){snd.page(so.pan,so.vol);break;}
+      S.leaves++;st.empty=true;const s=srcOf(st);snd.chair(s.pan,s.vol);
+      const w=mkWalker({kind:"student",x:st.x,z:st.z,suit:st.cloth,pants:"#2a2d33",hair:st.hair,skin:st.skin,speed:.95});
+      walkers.push(w);
+      goTo(w,route(w.x,w.z,4.05,.85),()=>{const d=srcXZ(4.1,.85);snd.door(d.pan,d.vol);const i=walkers.indexOf(w);if(i>=0)walkers.splice(i,1);});
+      break;}
+  }
+}
+function patrol(){
+  const w=freeProctor();if(!w){snd.page(0,.5);return;}
+  const mids=[-1.3,1.3],sides=[-3.72,3.72];
+  const a=pick(Math.random()<.7?mids:sides);let b=pick(mids.concat(sides).filter(x=>x!==a));
+  goTo(w,chainRoute(w,[[a,ZB],[b,ZB],[b,ZF],[w.home.x,w.home.z]]));
+}
+function idCheck(){
+  const w=freeProctor(cam.x,cam.z);
+  const tz=Math.max(cam.z-1,ZF);
+  if(!w){showIdCard();return;}
+  goTo(w,route(w.x,w.z,aisleNear(cam.x),tz),()=>{w.hidden=true;const s=srcXZ(cam.x+.6,cam.z);snd.step(s.pan,.9);
+    showIdCard(()=>{w.hidden=false;goHome(w);});});
+}
+function showIdCard(cb){
+  if(S.phase!=="exam"){cb&&cb();return;}
+  $("#idc").hidden=false;snd.page(-.4,.6);
+  setTimeout(()=>{$("#idc").hidden=true;if(S.phase==="exam"&&S.omrGiven){S.stamp=true;paintStamp();}cb&&cb();},4800);
+}
+
+/* ───────── 캔버스 장면 ───────── */
+const cv=$("#scene"),cx=cv.getContext("2d");
+let VW=800,VH=300,DPR=1;
+const cam={x:0,z:6,y:1.18,f:400,hy:200};
+function resize(){const r=cv.getBoundingClientRect();DPR=Math.min(2,window.devicePixelRatio||1);VW=Math.max(1,r.width);VH=Math.max(1,r.height);cv.width=Math.round(VW*DPR);cv.height=Math.round(VH*DPR);}
+function setCam(){cam.x=COLS[S.col];cam.z=seatZ(S.row)+.05;const base=Math.min(VH*1.45,VW*.75);cam.f=base*Math.min(1,Math.max(.55,cam.z/5));cam.hy=VH*.64;}
+function P(x,y,z){const d=cam.z-z,s=cam.f/d;return {x:VW/2+(x-cam.x)*s,y:cam.hy-(y-cam.y)*s,s};}
+function q4(a,b,c,d,fill){cx.beginPath();cx.moveTo(a.x,a.y);cx.lineTo(b.x,b.y);cx.lineTo(c.x,c.y);cx.lineTo(d.x,d.y);cx.closePath();cx.fillStyle=fill;cx.fill();}
+function wx(v,z0,z1,y0,y1,f){q4(P(v,y0,z0),P(v,y1,z0),P(v,y1,z1),P(v,y0,z1),f);}
+function wz(v,x0,x1,y0,y1,f){q4(P(x0,y0,v),P(x0,y1,v),P(x1,y1,v),P(x1,y0,v),f);}
+function ln(a,b,col,w){cx.beginPath();cx.moveTo(a.x,a.y);cx.lineTo(b.x,b.y);cx.strokeStyle=col;cx.lineWidth=w;cx.stroke();}
+function atDepth(x0,z,fn){const d=cam.z-z;if(d<.35)return;const s=cam.f/d;cx.setTransform(DPR*s,0,0,-DPR*s,DPR*(VW/2+(x0-cam.x)*s),DPR*(cam.hy+cam.y*s));fn(s);cx.setTransform(DPR,0,0,DPR,0,0);}
+function rr(x,y,w,h,f){cx.fillStyle=f;cx.fillRect(x,y,w,h);}
+function ell(x,y,rx,ry,f){cx.beginPath();cx.ellipse(x,y,rx,ry,0,0,Math.PI*2);cx.fillStyle=f;cx.fill();}
+
+function drawRoom(){
+  const zn=cam.z-.3,X0=-4.2,X1=4.2,H=2.8;
+  cx.setTransform(DPR,0,0,DPR,0,0);
+  cx.fillStyle="#cfc8b4";cx.fillRect(0,0,VW,VH);
+  q4(P(X0,H,0),P(X1,H,0),P(X1,H,zn),P(X0,H,zn),"#dcd9ce");
+  q4(P(X0,0,0),P(X1,0,0),P(X1,0,zn),P(X0,0,zn),"#86684a");
+  for(let x=X0;x<=X1+.01;x+=.35)ln(P(x,0,0),P(x,0,zn),"rgba(40,25,10,.16)",1);
+  wx(X0,0,zn,0,H,"#e4ddc8");wx(X1,0,zn,0,H,"#ddd4bd");wz(0,X0,X1,0,H,"#ebe5d1");
+  wx(X0,0,zn,0,.95,"#a6b5a3");wx(X1,0,zn,0,.95,"#a1b09e");wz(0,X0,X1,0,.95,"#aab9a7");
+  wx(X0,0,zn,.95,1,"#8c9b89");wx(X1,0,zn,.95,1,"#899886");wz(0,X0,X1,.95,1,"#8f9e8c");
+  for(const [z0,z1] of [[.7,2.2],[2.6,4.1],[4.5,6],[6.4,7.9]]){
+    if(z0>=zn)continue;const zz=Math.min(z1,zn);
+    wx(X0,z0,zz,1.08,2.42,"#f2efe5");wx(X0,z0+.07,zz-.07,1.14,2.36,"#b9d4de");
+    wx(X0,z0+.07,zz-.07,1.14,1.5,"#cfe2e6");
+    const m=(z0+zz)/2;ln(P(X0,1.14,m),P(X0,2.36,m),"#f2efe5",Math.max(1,.05*P(X0,1,m).s));
+    ln(P(X0,1.78,z0+.07),P(X0,1.78,zz-.07),"#f2efe5",Math.max(1,.035*P(X0,1,m).s));
+  }
+  wx(X1,.3,1.25,0,2.1,"#8a6d50");wx(X1,.45,1.1,1.3,1.95,"#c6d8de");
+  if(2.6<zn){wx(X1,2.6,Math.min(4.6,zn),1.15,2.0,"#b48a5b");
+    [[2.75,3.2,1.5,1.9],[3.35,3.75,1.3,1.85],[3.9,4.4,1.45,1.9]].forEach(([a,b,c,d])=>{if(b<zn)wx(X1-.01,a,b,c,d,"#f4f1e6");});}
+  for(const z of [1.4,3.5,5.6,7.7]){if(z+.6>=zn)continue;for(const x of [-1.9,1.9])q4(P(x-.14,H-.01,z-.6),P(x+.14,H-.01,z-.6),P(x+.14,H-.01,z+.6),P(x-.14,H-.01,z+.6),"#fffef4");}
+  wz(0,-2.44,2.44,.8,2.2,"#6c5841");wz(0,-2.34,2.34,.88,2.12,"#2e4a3b");wz(0,-2.44,2.44,.8,.87,"#594834");
+  boardText();drawClock();drawSpeaker();
+}
+function boardText(){
+  const L=(x,y,sz,txt,a)=>{const p=P(x,y,0);cx.font=`${Math.max(6,sz*p.s)}px "Nanum Pen Script","Nanum Brush Script",cursive`;cx.fillStyle=`rgba(236,239,226,${a||.9})`;cx.fillText(txt,p.x,p.y);};
+  cx.textBaseline="alphabetic";cx.textAlign="left";
+  L(-2.15,1.86,.21,"SQL 개발자(SQLD) 모의시험",.95);
+  const u0=P(-2.15,1.8,0),u1=P(-.55,1.8,0);ln(u0,u1,"rgba(236,239,226,.6)",Math.max(1,.012*u0.s));
+  L(-2.15,1.6,.15,`제 ${S.room} 시험실`);
+  L(-2.15,1.38,.15,`시험시간  09:00 ~ ${hm(9*3600+S.dur*60)}  (${S.dur}분)`);
+  L(-2.15,1.17,.13,"전자기기 전원 끄고 제출 · 신분증은 책상 위");
+  L(-2.15,.98,.12,"1과목 10문항 · 2과목 40문항 · 문항당 2점",.75);
+  const d=new Date(),days="일월화수목금토";
+  cx.textAlign="right";L(2.15,1.86,.15,`${d.getMonth()+1}월 ${d.getDate()}일 (${days[d.getDay()]})`);cx.textAlign="left";
+}
+function drawClock(){
+  const c=P(0,2.48,0),R=.16*c.s;
+  cx.beginPath();cx.arc(c.x,c.y,R,0,Math.PI*2);cx.fillStyle="#fbfaf4";cx.fill();cx.lineWidth=Math.max(1,R*.13);cx.strokeStyle="#2a2a2a";cx.stroke();
+  for(let i=0;i<12;i++){const a=i/12*Math.PI*2;cx.beginPath();cx.moveTo(c.x+Math.sin(a)*R*.74,c.y-Math.cos(a)*R*.74);cx.lineTo(c.x+Math.sin(a)*R*.88,c.y-Math.cos(a)*R*.88);cx.lineWidth=Math.max(.8,R*(i%3?.05:.09));cx.strokeStyle="#333";cx.stroke();}
+  const v=vSec(),hd=((v/3600)%12)/12,mn=((v/60)%60)/60,sc=(Math.floor(v)%60)/60;
+  const hand=(f,len,w,col)=>{const a=f*Math.PI*2;cx.beginPath();cx.moveTo(c.x,c.y);cx.lineTo(c.x+Math.sin(a)*R*len,c.y-Math.cos(a)*R*len);cx.lineWidth=Math.max(.8,w*R);cx.strokeStyle=col;cx.lineCap="round";cx.stroke();cx.lineCap="butt";};
+  hand(hd,.5,.11,"#1d1d1d");hand(mn,.76,.07,"#1d1d1d");hand(sc,.82,.025,"#c81e1e");
+}
+function drawSpeaker(){
+  const a=P(3.15,2.62,0),b=P(3.55,2.36,0);
+  cx.fillStyle="#d9d4c6";cx.fillRect(a.x,a.y,b.x-a.x,b.y-a.y);cx.strokeStyle="#9a9484";cx.lineWidth=1;cx.strokeRect(a.x,a.y,b.x-a.x,b.y-a.y);
+  cx.fillStyle="#8a8474";const w=b.x-a.x,h=b.y-a.y;
+  for(let i=1;i<6;i++)for(let j=1;j<4;j++){cx.beginPath();cx.arc(a.x+w*i/6,a.y+h*j/4,Math.max(.6,w*.025),0,7);cx.fill();}
+  if(S.speaking){const cxp=a.x,cyp=a.y+h/2,t=now();cx.strokeStyle="rgba(242,201,76,.85)";cx.lineWidth=Math.max(1,w*.04);
+    for(let k=0;k<3;k++){const r=w*(.25+k*.22)+((t*40)%(w*.22));cx.beginPath();cx.arc(cxp,cyp,r,Math.PI*.75,Math.PI*1.25);cx.stroke();}}
+}
+function drawPodium(){wz(1.15,-.48,.48,0,1.05,"#7a5a3c");q4(P(-.48,1.05,.8),P(.48,1.05,.8),P(.48,1.05,1.15),P(-.48,1.05,1.15),"#97734f");wz(1.151,-.4,.4,.55,.9,"#6c4f34");}
+function drawSeat(st,t){
+  const x=st.x,z=st.z;
+  q4(P(x-.3,.74,z-.78),P(x+.3,.74,z-.78),P(x+.3,.74,z-.3),P(x-.3,.74,z-.3),"#c7a376");
+  q4(P(x-.3,.74,z-.3),P(x+.3,.74,z-.3),P(x+.3,.7,z-.3),P(x-.3,.7,z-.3),"#97764f");
+  if(S.paperGiven&&!st.empty)q4(P(x-.22,.742,z-.72),P(x+.12,.742,z-.72),P(x+.14,.742,z-.38),P(x-.2,.742,z-.38),"#f3f1e8");
+  const l=P(x-.27,.7,z-.32),r=P(x+.27,.7,z-.32),lw=Math.max(1,.025*l.s);
+  ln(l,P(x-.27,0,z-.32),"#6c7077",lw);ln(r,P(x+.27,0,z-.32),"#6c7077",lw);
+  if(!st.empty)atDepth(x+(REDUCED?0:Math.sin(t*.9+st.ph)*.01),z,()=>bodySeated(st,t));
+  atDepth(x,z+.25,()=>{rr(-.2,0,.03,.86,"#5b6067");rr(.17,0,.03,.86,"#5b6067");rr(-.21,.42,.42,.04,"#8a6844");rr(-.19,.58,.38,.26,"#a07a51");});
+}
+function bodySeated(st,t){
+  if(st.act&&t>st.a1)st.act=null;
+  const a=st.act,e=a?clamp((t-st.a0)/.45,0,1)*(st.a1===Infinity?1:clamp((st.a1-t)/.45,0,1)):0;
+  const k=st.w;
+  cx.beginPath();cx.moveTo(-.17*k,.55);cx.lineTo(-.2*k,.95);cx.quadraticCurveTo(-.21*k,1.07,-.1*k,1.09);cx.lineTo(.1*k,1.09);cx.quadraticCurveTo(.21*k,1.07,.2*k,.95);cx.lineTo(.17*k,.55);cx.closePath();cx.fillStyle=st.cloth;cx.fill();
+  const arm=(pts)=>{cx.beginPath();cx.moveTo(pts[0][0],pts[0][1]);for(let i=1;i<pts.length;i++)cx.lineTo(pts[i][0],pts[i][1]);cx.strokeStyle=st.cloth;cx.lineWidth=.075;cx.lineCap="round";cx.lineJoin="round";cx.stroke();};
+  const lerp=(p,q)=>p+(q-p)*e;
+  if(a==="stretch"){arm([[-.19,1.02],[lerp(-.26,-.3),lerp(.9,1.38)],[lerp(-.2,-.12),lerp(.85,1.72)]]);arm([[.19,1.02],[lerp(.26,.3),lerp(.9,1.38)],[lerp(.2,.12),lerp(.85,1.72)]]);}
+  if(a==="hand")arm([[.19,1.02],[lerp(.26,.25),lerp(.9,1.4)],[lerp(.2,.24),lerp(.85,1.76)]]);
+  let hx=0,hy=1.17+(REDUCED?0:Math.sin(t*1.3+st.ph)*.004);
+  if(a==="look"){hy+=.045*e;hx=.03*e*(st.ph>3?1:-1);}
+  if(a==="stretch")hy+=.05*e;
+  rr(-.04,1.04,.08,.08,st.skin);
+  ell(hx-.094,hy,.02,.03,st.skin);ell(hx+.094,hy,.02,.03,st.skin);
+  if(a==="look")ell(hx+(st.ph>3?.04:-.04),hy-.01,.06,.085,st.skin);
+  ell(hx,hy+.01,.096,.112,st.hair);
+  if(a==="scratch"){const sx=Math.sin(t*14)*.012;arm([[.19,1.02],[.31,lerp(1.0,1.3)],[lerp(.24,.06+sx),lerp(.95,1.27)]]);}
+}
+function drawStanding(w,t){
+  atDepth(w.x,w.z,()=>{
+    ell(0,.01,.26,.035,"rgba(0,0,0,.18)");
+    const sw=w.moving&&!REDUCED?Math.sin(w.walkT*7.5)*.08:0;
+    rr(-.11+sw*.4,0,.09,.88,w.pants);rr(.02-sw*.4,0,.09,.88,w.pants);
+    cx.beginPath();cx.moveTo(-.19,.84);cx.lineTo(-.22,1.38);cx.quadraticCurveTo(-.22,1.47,-.1,1.48);cx.lineTo(.1,1.48);cx.quadraticCurveTo(.22,1.47,.22,1.38);cx.lineTo(.19,.84);cx.closePath();cx.fillStyle=w.suit;cx.fill();
+    cx.strokeStyle=w.suit;cx.lineWidth=.07;cx.lineCap="round";
+    cx.beginPath();cx.moveTo(-.215,1.38);cx.lineTo(-.25-sw*.5,.88);cx.stroke();cx.beginPath();cx.moveTo(.215,1.38);cx.lineTo(.25+sw*.5,.88);cx.stroke();
+    const face=!w.moving||w.vz>0;
+    if(w.kind==="proctor"){rr(-.28-sw*.2,1.13,.08,.07,"#e1c44a");if(face)rr(.05,1.28,.08,.04,"#f3f1e8");}
+    rr(-.035,1.45,.07,.07,w.skin);
+    if(face){ell(0,1.6,.093,.11,w.skin);cx.beginPath();cx.ellipse(0,1.64,.1,.085,0,0,Math.PI);cx.fillStyle=w.hair;cx.fill();}
+    else ell(0,1.61,.097,.115,w.hair);
+  });
+}
+function drawScene(t){
+  setCam();drawRoom();
+  const items=[{z:1.15,f:drawPodium}];
+  for(const st of students){if(cam.z-st.z<.5)continue;items.push({z:st.z,f:()=>drawSeat(st,t)});}
+  for(const w of walkers){if(w.hidden||cam.z-w.z<.45)continue;items.push({z:w.z+.01,f:()=>drawStanding(w,t)});}
+  items.sort((a,b)=>a.z-b.z);for(const it of items)it.f();
+  cx.setTransform(DPR,0,0,DPR,0,0);
+  const g=cx.createRadialGradient(VW/2,VH*.45,Math.min(VW,VH)*.3,VW/2,VH*.45,Math.max(VW,VH)*.75);
+  g.addColorStop(0,"rgba(0,0,0,0)");g.addColorStop(1,"rgba(20,15,10,.32)");cx.fillStyle=g;cx.fillRect(0,0,VW,VH);
+}
+
+/* ───────── 미니 시계 ───────── */
+(function(){let h="";for(let i=0;i<12;i++){const a=i/12*Math.PI*2;h+=`<line x1="${20+Math.sin(a)*14}" y1="${20-Math.cos(a)*14}" x2="${20+Math.sin(a)*16.5}" y2="${20-Math.cos(a)*16.5}" stroke="#55605b" stroke-width="${i%3?1:1.8}"/>`;}$("#mticks").innerHTML=h;})();
+function updMini(){const v=vSec();$("#mh").setAttribute("transform",`rotate(${((v/3600)%12)*30} 20 20)`);$("#mm").setAttribute("transform",`rotate(${((v/60)%60)*6} 20 20)`);$("#ms").setAttribute("transform",`rotate(${(Math.floor(v)%60)*6} 20 20)`);}
+function updChip(){$("#chipTxt").innerHTML=`<b>제${S.room}시험실 ${S.seat}번</b> · ${S.examNo}`;}
+
+/* ───────── 문제지 ───────── */
+function tblHTML(t){return `<table class="tb"><caption>[${esc(t.name)}]</caption><thead><tr>${t.cols.map(c=>`<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${t.rows.map(r=>`<tr>${r.map(v=>`<td>${esc(v)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;}
+function qHTML(i){
+  const q=QS[i],p=S.perm[i];
+  return `<div class="q"><p class="qh"><span class="qn${S.paperS[i]?" slash":""}" data-q="${i}" tabindex="0" role="button" aria-label="${i+1}번 다시 볼 문제 표시">${i+1}.</span> ${esc(q.q)}</p>`+
+    (q.t?`<div class="tbls">${q.t.map(tblHTML).join("")}</div>`:"")+(q.code?`<pre class="code">${esc(q.code)}</pre>`:"")+
+    `<ol class="opts">${p.map((oi,k)=>`<li class="opt${S.paperC[i]===k?" circ":""}" data-q="${i}" data-o="${k}" tabindex="0" role="button"><span class="cn">${CN[k]}</span>${q.oc?`<code class="oc">${esc(q.o[oi])}</code>`:`<span>${esc(q.o[oi])}</span>`}</li>`).join("")}</ol></div>`;
+}
+function renderPaper(){
+  const el=$("#paper");
+  if(!S.paperGiven){el.innerHTML='<div class="empty-sheet">문제지 배부 전입니다.<br>감독관 안내를 기다리세요.</div>';return;}
+  if(!S.paperOpen){
+    el.innerHTML=`<div class="cover"><p class="yr">${new Date().getFullYear()}년도 대비 실전 연습</p><h2>SQL 개발자 모의시험</h2><p class="sub">문제지 · 자체 제작 모의문제</p>
+    <table><tr><th>과목</th><th>문항 수</th><th>배점</th></tr><tr><td>제1과목 데이터 모델링의 이해</td><td>10</td><td>20점</td></tr><tr><td>제2과목 SQL 기본 및 활용</td><td>40</td><td>80점</td></tr><tr><th>시험 시간</th><td colspan="2">${S.dur}분 (09:00 ~ ${hm(9*3600+S.dur*60)})</td></tr></table>
+    <div class="rules"><h3>수험자 유의사항</h3><ol><li>시험 시작 안내가 있기 전에는 문제지를 넘기지 마십시오.</li><li>답안은 반드시 컴퓨터용 사인펜으로 OMR 답안지에 표기하십시오. 문제지에 쓴 답은 채점하지 않습니다.</li><li>답을 고칠 때는 수정테이프만 사용하십시오. 한 문항에 두 개 이상 표기하면 오답으로 처리합니다.</li><li>시험 중 전자기기를 가지고 있으면 부정행위로 처리합니다.</li><li>퇴실 가능 시간 이후에만 답안지를 제출하고 퇴실할 수 있습니다.</li></ol></div>
+    <p class="wait">시험 시작 전입니다 · 문제지를 넘기지 마십시오</p></div>`;
+    return;
+  }
+  const pages=[[0,5],[5,10]];for(let i=10;i<QS.length;i+=6)pages.push([i,Math.min(i+6,QS.length)]);
+  el.innerHTML=pages.map(([a,b],pi)=>{
+    const s=QS[a].s,first=a===0||a===10;
+    return `<section class="page"><div class="page-head"><b>SQL 개발자 모의시험</b><span>${s===1?"제1과목 · 데이터 모델링의 이해":"제2과목 · SQL 기본 및 활용"}</span></div>`+
+      (first?`<p class="subj">${s===1?"제1과목 데이터 모델링의 이해 (1번 ~ 10번)":"제2과목 SQL 기본 및 활용 (11번 ~ 50번) · 별도 표시가 없으면 Oracle 기준"}</p>`:"")+
+      `<div class="cols">${Array.from({length:b-a},(_,k)=>qHTML(a+k)).join("")}</div><p class="page-foot">- ${pi+1} -</p></section>`;
+  }).join("")+'<p class="end-mark">문제지 끝</p>';
+}
+$("#paper").addEventListener("click",e=>{
+  if(S.phase!=="exam")return;
+  const o=e.target.closest(".opt");
+  if(o){const q=+o.dataset.q,k=+o.dataset.o;S.paperC[q]=S.paperC[q]===k?null:k;
+    o.parentElement.querySelectorAll(".opt").forEach(li=>li.classList.toggle("circ",+li.dataset.o===S.paperC[q]));snd.pencil();return;}
+  const n=e.target.closest(".qn");
+  if(n){const q=+n.dataset.q;S.paperS[q]=!S.paperS[q];n.classList.toggle("slash",S.paperS[q]);snd.pencil();}
+});
+document.addEventListener("keydown",e=>{if((e.key==="Enter"||e.key===" ")&&e.target.matches&&e.target.matches(".opt,.qn")){e.preventDefault();e.target.click();}});
+
+/* ───────── OMR ───────── */
+function renderOmr(){
+  const el=$("#omrBox");
+  if(!S.omrGiven){el.innerHTML='<div class="empty-sheet">답안지 배부 전입니다.</div>';return;}
+  const idRows=Array.from({length:10},(_,d)=>`<tr>${Array.from({length:8},(_,c)=>`<td><button class="b" data-c="${c}" data-d="${d}" aria-label="수험번호 ${c+1}번째 자리 ${d}">${d}</button></td>`).join("")}</tr>`).join("");
+  const col=(a,b)=>`<div class="acol"><div class="ahead"><span>문번</span><span>답 란</span></div>${Array.from({length:b-a},(_,k)=>{const i=a+k;return `<div class="arow${(i+1)%5===0?" g5":""}"><span class="anum">${i+1}</span><span class="abubs">${[0,1,2,3].map(o=>`<button class="b" data-q="${i}" data-o="${o}" aria-label="${i+1}번 ${CN[o]}">${o+1}</button>`).join("")}</span></div>`;}).join("")}</div>`;
+  el.innerHTML=`<div class="omr"><div class="tm" aria-hidden="true"></div>
+   <div class="omr-title">SQL 개발자 모의시험 답안지<small>컴퓨터용 사인펜만 사용 · 수정은 수정테이프로</small></div>
+   <div class="omr-info">
+     <div class="fld-o"><div class="lab">성 명</div><button class="val" id="nameBox" aria-label="성명 기재"></button></div>
+     <div class="fld-o"><div class="lab">감독관 확인</div><div class="stampbox" id="stampBox"></div></div>
+   </div>
+   <table class="idg"><tbody><tr class="lab"><td colspan="8">수 험 번 호</td></tr><tr class="wr">${Array.from({length:8},(_,c)=>`<td id="idw${c}"></td>`).join("")}</tr>${idRows}</tbody></table>
+   <ol class="notes"><li>답란은 ● 처럼 칸을 완전히 칠합니다.</li><li>한 문항에 두 개 이상 표기하면 오답으로 처리합니다.</li><li>수험번호를 잘못 표기하면 채점에서 불이익을 받을 수 있습니다.</li></ol>
+   <div class="ans">${col(0,20)}${col(20,40)}${col(40,50)}</div></div>`;
+  for(let i=0;i<QS.length;i++)paintQ(i);for(let c=0;c<8;c++)paintId(c);paintName();paintStamp();
+  if(S.phase==="collect"||S.phase==="result")$(".omr").classList.add("locked");
+}
+function paintQ(i){document.querySelectorAll(`.b[data-q="${i}"]`).forEach(b=>{const s=S.omr[i][+b.dataset.o];b.classList.toggle("m",!!(s&1));b.classList.toggle("t",!!(s&2));});}
+function paintId(c){document.querySelectorAll(`.b[data-c="${c}"]`).forEach(b=>{const s=S.idm[c][+b.dataset.d];b.classList.toggle("m",!!(s&1));b.classList.toggle("t",!!(s&2));});
+  const w=$("#idw"+c);if(w){const ds=S.idm[c].map((s,d)=>s&1?d:null).filter(v=>v!==null);w.textContent=ds.join("");}}
+function paintName(){const n=$("#nameBox");if(n)n.textContent=S.nameOn?S.name:"";}
+function paintStamp(){const s=$("#stampBox");if(s)s.innerHTML=S.stamp?'<span class="stamp">확인</span>':'<span class="stamp-empty">(인)</span>';}
+function applyMark(arr,i){
+  if(S.tool==="pen"){if(arr[i]&1)return false;arr[i]|=1;snd.pen();return true;}
+  if(arr[i]&1){arr[i]=2;snd.tape();return true;}
+  return false;
+}
+$("#omrBox").addEventListener("click",e=>{
+  if(!S.omrGiven||S.phase==="collect"||S.phase==="result"||S.phase==="intro")return;
+  if(e.target.closest("#nameBox")){if(S.tool==="pen"){if(!S.nameOn){S.nameOn=true;snd.pen();}}else if(S.nameOn){S.nameOn=false;snd.tape();}paintName();return;}
+  const b=e.target.closest(".b");if(!b)return;
+  if(b.dataset.q!=null){
+    if(S.phase!=="exam"){toast("시험 시작 전에는 답을 표기할 수 없습니다. 성명과 수험번호만 먼저 표기하세요.");return;}
+    const i=+b.dataset.q;if(applyMark(S.omr[i],+b.dataset.o))paintQ(i);
+  }else{const c=+b.dataset.c;if(applyMark(S.idm[c],+b.dataset.d))paintId(c);}
+});
+
+/* ───────── 화면 조각 ───────── */
+let toastT=0;
+function toast(msg){const t=$("#toast");t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{t.hidden=true;},3600);}
+function showModal(title,html,acts){
+  $("#mTitle").textContent=title;$("#mBody").innerHTML=html;const box=$("#mActs");box.innerHTML="";
+  acts.forEach(a=>{const b=document.createElement("button");b.className="dbtn"+(a.primary?" primary":"");b.textContent=a.label;b.addEventListener("click",()=>{closeModal();a.fn&&a.fn();});box.appendChild(b);});
+  $("#modal").hidden=false;const f=box.querySelector(".primary")||box.querySelector("button");f&&f.focus();
+}
+function closeModal(){$("#modal").hidden=true;}
+function phoneModal(){
+  showModal("전자기기 제출","<p>감독관이 휴대전화를 걷고 있습니다. 전원을 끄고 봉투에 넣어 제출하세요.</p>",[{label:"전원 끄고 제출",primary:true,fn:()=>{tone({f:880,f2:440,dur:.25,peak:.08});snd.page(.2,.6);toast("휴대전화를 제출했습니다.");}}]);
+}
+function setTool(t){S.tool=t;$("#toolPen").setAttribute("aria-pressed",t==="pen");$("#toolTape").setAttribute("aria-pressed",t==="tape");}
+function setTab(t){$("#desk").dataset.tab=t;$("#tabPaper").setAttribute("aria-pressed",t==="paper");$("#tabOmr").setAttribute("aria-pressed",t==="omr");}
+$("#toolPen").onclick=()=>setTool("pen");$("#toolTape").onclick=()=>setTool("tape");
+$("#tabPaper").onclick=()=>setTab("paper");$("#tabOmr").onclick=()=>setTab("omr");
+$("#skipPre").onclick=skipPre;
+$("#btnScene").onclick=()=>{const off=$("#app").classList.toggle("scene-off");$("#btnScene").textContent=off?"교실 보기":"교실 접기";setTimeout(resize,30);};
+$("#btnSound").onclick=()=>{S.sound=!S.sound;$("#btnSound").textContent=S.sound?"소리 끄기":"소리 켜기";if(master)master.gain.setTargetAtTime(S.sound?1:0,AC.currentTime,.05);if(!S.sound)cancelSpeech();};
+$("#btnSwap").onclick=()=>{
+  if(S.phase!=="exam")return;
+  const left=S.examT0+S.dur*60-now();
+  if(left<W2()*60){showModal("답안지 교체 불가",`<p>시험 종료 ${W2()}분 전부터는 답안지를 교체할 수 없습니다. 수정테이프로 고치세요.</p>`,[{label:"확인",primary:true}]);return;}
+  showModal("답안지 교체 요청","<p>새 답안지를 받으면 지금까지 표기한 성명, 수험번호, 답이 모두 사라집니다. 처음부터 다시 옮겨 적어야 합니다.</p><p>감독관 확인 도장도 다시 받아야 합니다.</p>",[
+    {label:"취소"},{label:"교체 요청",primary:true,fn:()=>{
+      const w=freeProctor(cam.x,cam.z);
+      if(w)goTo(w,route(w.x,w.z,aisleNear(cam.x),Math.max(cam.z-1,ZF)),()=>setTimeout(()=>goHome(w),1200));
+      toast("손을 들었습니다. 감독관이 새 답안지를 가지고 옵니다.");
+      setTimeout(()=>{if(S.phase!=="exam")return;S.omr=QS.map(()=>[0,0,0,0]);S.idm=Array.from({length:8},()=>Array(10).fill(0));S.nameOn=false;S.stamp=false;S.swaps++;renderOmr();snd.page(.3,.9);toast("새 답안지를 받았습니다. 성명과 수험번호부터 다시 표기하세요.");},4200);
+    }}]);
+};
+$("#btnSubmit").onclick=()=>{
+  if(S.phase!=="exam")return;
+  const marked=S.omr.filter(r=>r.some(s=>s&1)).length;
+  showModal("답안지를 제출할까요?",`<p>표기한 문항 ${marked} / ${QS.length}. 제출하면 더 이상 고칠 수 없습니다.</p>`+(S.leaveOk?"":"<p>아직 퇴실 가능 시간 전입니다. 실제 시험이라면 지금은 나갈 수 없어요.</p>"),[{label:"계속 풀기"},{label:"제출하고 퇴실",primary:true,fn:()=>finish("submit")}]);
+};
+
+/* ───────── 결과 ───────── */
+function showResult(){
+  S.phase="result";$("#collect").hidden=true;paQ.length=0;paTok++;cancelSpeech();$("#pa").hidden=true;
+  if(AC)amb.gain.setTargetAtTime(0,AC.currentTime,.4);
+  let s1=0,s2=0,blank=0,dup=0,mis=0,wrong=0;const rows=[];
+  QS.forEach((q,i)=>{
+    const marks=[0,1,2,3].filter(o=>S.omr[i][o]&1),cor=S.perm[i].indexOf(q.a);let st,mine=null;
+    if(!marks.length){st="blank";blank++;}else if(marks.length>1){st="dup";dup++;}else{mine=marks[0];st=mine===cor?"ok":"no";}
+    if(st==="ok"){if(q.s===1)s1+=2;else s2+=2;}else wrong++;
+    const pc=S.paperC[i];const mm=pc!==null&&pc!==mine;if(mm&&mine!==null)mis++;
+    rows.push({i,q,st,mine,cor,marks,pc,mm});
+  });
+  const tot=s1+s2,pass=tot>=60&&s1>=8&&s2>=32;
+  const idOk=S.examNo.split("").every((d,c)=>{const m=S.idm[c].map((s,k)=>s&1?k:null).filter(v=>v!==null);return m.length===1&&m[0]===+d;});
+  const used=Math.max(0,S.endAt-S.examT0),um=Math.floor(used/60),us=Math.floor(used%60);
+  const lab={ok:"정답",no:"오답",blank:"미표기",dup:"중복 표기"};
+  const optTxt=(r,k)=>k==null?"없음":`${CN[k]} ${esc(r.q.o[S.perm[r.i][k]])}`;
+  const mineTxt=r=>r.st==="blank"?"표기 없음":r.st==="dup"?r.marks.map(k=>CN[k]).join(", ")+" (중복)":optTxt(r,r.mine);
+  const facts=[
+    [`${um}분 ${us}초`,`사용한 시간 (제한 ${S.dur}분)`,false],
+    [`${blank}문항`,"OMR 미표기",blank>0],
+    [`${dup}문항`,"중복 표기 (오답 처리)",dup>0],
+    [`${mis}문항`,"문제지에 고른 답과 OMR이 다름",mis>0],
+    [idOk?"정상":"오류",`수험번호 표기 · 성명 ${S.nameOn?"기재":"누락"}`,!idOk||!S.nameOn],
+    [`${S.events}회`,`방해 상황 · 답안지 교체 ${S.swaps}회`,false]
+  ];
+  const r=$("#result");
+  r.innerHTML=`<div class="report">
+   <div class="r-top"><div><h1>모의시험 성적 통지</h1><p>${esc(S.name)} · 수험번호 ${S.examNo} · 제${S.room}시험실 ${S.seat}번</p></div><div class="verdict ${pass?"pass":"fail"}">${pass?"합격":"불합격"}</div></div>
+   <dl class="scores">
+     <div><dt>총점</dt><dd>${tot}<small> / 100</small></dd>${tot<60?'<span class="cut">60점 미만</span>':""}</div>
+     <div><dt>제1과목 데이터 모델링의 이해</dt><dd>${s1}<small> / 20</small></dd>${s1<8?'<span class="cut">과락 (8점 미만)</span>':""}</div>
+     <div><dt>제2과목 SQL 기본 및 활용</dt><dd>${s2}<small> / 80</small></dd>${s2<32?'<span class="cut">과락 (32점 미만)</span>':""}</div>
+   </dl>
+   <div class="facts">${facts.map(([b,t,al])=>`<div class="fact${al?" alert":""}"><b>${b}</b>${t}</div>`).join("")}</div>
+   <div class="r-sec"><h2><span>문항별 확인 (${wrong}문항 틀림)</span><span class="seg" style="border-color:#bdb6a6"><button id="fAll" aria-pressed="true" style="background:#fff;color:#1d1c1a">전체</button><button id="fWrong" aria-pressed="false" style="background:#fff;color:#1d1c1a">틀린 문제만</button></span></h2>
+   <div id="rvList">${rows.map(x=>`<div class="rv" data-st="${x.st}"><div><div class="no">${x.i+1}번</div><span class="pill ${x.st}">${lab[x.st]}</span></div><div>
+     <p class="qt">${esc(x.q.q)}</p>
+     <p class="an">내 답: ${mineTxt(x)}${x.mm?` · <span style="color:var(--warn)">문제지에는 ${CN[x.pc]}을 골랐어요</span>`:""}<br>정답: ${optTxt(x,x.cor)}</p>
+     <p class="ex">${esc(x.q.e)}</p></div></div>`).join("")}</div></div>
+   <div class="r-acts"><button class="dbtn primary" id="again">새 좌석으로 다시 응시</button></div>
+  </div>`;
+  r.hidden=false;
+  const paint=on=>{$("#fAll").setAttribute("aria-pressed",!on);$("#fWrong").setAttribute("aria-pressed",on);$("#fAll").style.background=on?"#fff":"#1d1c1a";$("#fAll").style.color=on?"#1d1c1a":"#fff";$("#fWrong").style.background=on?"#1d1c1a":"#fff";$("#fWrong").style.color=on?"#fff":"#1d1c1a";
+    document.querySelectorAll(".rv").forEach(el=>{el.hidden=on&&el.dataset.st==="ok";});};
+  paint(false);
+  $("#fAll").onclick=()=>paint(false);$("#fWrong").onclick=()=>paint(true);
+  $("#again").onclick=()=>location.reload();
+}
+
+/* ───────── 루프 ───────── */
+/* 시간 진행은 setInterval로 돌려 탭이 가려져도 시험 시간이 멈추지 않게 한다. 그리기만 rAF. */
+let lastT=now();
+function logic(){
+  const t=now();let dt=t-lastT;lastT=t;
+  if(S.phase==="pre"){const e=t-S.preT0;for(const it of S.tl){if(!S.fired.has(it.id)&&e>=it.t){S.fired.add(it.id);fire(it);}}if(e>=S.preLen)startExam();}
+  else if(S.phase==="exam"){const e=t-S.examT0;for(const it of S.etl){if(!S.fired.has(it.id)&&e>=it.t){S.fired.add(it.id);fire(it);}}}
+  if((S.phase==="pre"||S.phase==="exam")&&t>=S.nextEv){doEvent();scheduleNext();}
+  if(S.phase!=="result"){while(dt>0){const d=Math.min(.05,dt);for(const w of walkers.slice())stepWalker(w,d);dt-=d;}}
+  updMini();
+}
+function frame(){
+  if(!$("#app").classList.contains("scene-off")&&S.phase!=="result")drawScene(now());
+  requestAnimationFrame(frame);
+}
+
+/* ───────── 시작 ───────── */
+$("#tNo").textContent=S.examNo;$("#tRoom").textContent=`제${S.room}시험실`;
+$("#tSeat").textContent=`${S.seat}번 · 앞에서 ${S.row+1}번째 줄`;$("#tProc").textContent=`${nP}명 배치`;
+$("#introForm").addEventListener("submit",enter);
+updChip();renderPaper();renderOmr();
+window.addEventListener("resize",resize);resize();
+if(document.fonts&&document.fonts.load)document.fonts.load('20px "Nanum Pen Script"').catch(()=>{});
+setInterval(logic,50);requestAnimationFrame(frame);drawScene(now());
+})();
+</script>
