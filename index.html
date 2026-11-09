@@ -394,7 +394,7 @@ const S={phase:"intro",dur:90,level:"mid",pre:true,sound:true,tool:"pen",
   preT0:0,preLen:150,examT0:0,endAt:0,fired:new Set(),tl:[],etl:[],leaveOk:false,
   events:0,swaps:0,leaves:0,nextEv:0,speaking:false};
 S.seat=S.row*6+S.col+1;
-S.examNo="26"+String(S.room).padStart(2,"0")+String(S.seat).padStart(2,"0")+String(1000+Math.floor(Math.random()*9000));
+S.examNo="26"+String(S.room).padStart(2,"0")+String(S.seat).padStart(2,"0")+String(10+Math.floor(Math.random()*90)); /* OMR 수험번호 칸과 같은 8자리 */
 S.perm=QS.map(q=>{const p=[0,1,2,3];if(!q.fix){for(let i=3;i>0;i--){const j=Math.floor(Math.random()*(i+1));[p[i],p[j]]=[p[j],p[i]];}}return p;});
 
 /* ───────── 교실 공간 ───────── */
@@ -913,7 +913,7 @@ function showResult(){
     rows.push({i,q,st,mine,cor,marks,pc,mm});
   });
   const tot=s1+s2,pass=tot>=60&&s1>=8&&s2>=32;
-  const idOk=S.examNo.split("").every((d,c)=>{const m=S.idm[c].map((s,k)=>s&1?k:null).filter(v=>v!==null);return m.length===1&&m[0]===+d;});
+  const idOk=S.examNo.length===S.idm.length&&S.examNo.split("").every((d,c)=>{const m=S.idm[c].map((s,k)=>s&1?k:null).filter(v=>v!==null);return m.length===1&&m[0]===+d;});
   const used=Math.max(0,S.endAt-S.examT0),um=Math.floor(used/60),us=Math.floor(used%60);
   const lab={ok:"정답",no:"오답",blank:"미표기",dup:"중복 표기"};
   const optTxt=(r,k)=>k==null?"없음":`${CN[k]} ${esc(r.q.o[S.perm[r.i][k]])}`;

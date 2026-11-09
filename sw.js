@@ -1,6 +1,6 @@
-// 오프라인에서도 열리도록 앱 파일과 글꼴을 캐시한다.
+﻿// 오프라인에서도 열리도록 앱 파일과 글꼴을 캐시한다.
 // 앱 파일은 네트워크 우선이라 새 버전을 배포하면 다음 접속 때 바로 반영된다.
-const CACHE = 'sqld-exam-v1';
+const CACHE = 'sqld-exam-v2';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {
